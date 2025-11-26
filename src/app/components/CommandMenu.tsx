@@ -4,18 +4,15 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Command } from 'cmdk';
 import { 
-  Calculator, 
-  Calendar, 
-  CreditCard, 
   Settings, 
-  Smile, 
   User, 
   Search,
   Plus,
   Package,
-  History,
-  LogOut
+  LogOut,
+  ArrowUpRight 
 } from 'lucide-react';
+import { signOut } from '@/src/auth';
 
 export function CommandMenu() {
   const [open, setOpen] = React.useState(false);
@@ -38,8 +35,13 @@ export function CommandMenu() {
     command();
   }, []);
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
     <>
+      {/* Tombol Hint untuk Desktop */}
       <div className="fixed bottom-4 right-4 z-50 hidden md:flex items-center gap-2 text-xs text-slate-400 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
         <span>Press</span>
         <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-slate-100 px-1.5 font-mono text-[10px] font-medium text-slate-500 opacity-100">
@@ -77,6 +79,14 @@ export function CommandMenu() {
             </Command.Item>
             
             <Command.Item 
+              onSelect={() => runCommand(() => router.push('/outbound'))}
+              className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 cursor-pointer aria-selected:bg-rose-50 aria-selected:text-rose-700 transition-colors"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              <span>Process Outbound Order (Bulk)</span>
+            </Command.Item>
+
+            <Command.Item 
               onSelect={() => runCommand(() => router.push('/'))}
               className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100 cursor-pointer aria-selected:bg-slate-100 aria-selected:text-slate-900 transition-colors"
             >
@@ -93,6 +103,7 @@ export function CommandMenu() {
               <span>Profile (Coming Soon)</span>
             </Command.Item>
             <Command.Item 
+              onSelect={() => runCommand(handleSignOut)}
               className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 cursor-pointer aria-selected:bg-rose-50 aria-selected:text-rose-700 transition-colors"
             >
               <LogOut className="h-4 w-4" />

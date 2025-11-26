@@ -2,6 +2,7 @@ import pool from '@/src/lib/db';
 import { editProduct } from '@/src/app/actions';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { MapPin } from 'lucide-react';
 
 interface ProductDetail {
   id: number;
@@ -9,6 +10,7 @@ interface ProductDetail {
   sku: string;
   description: string;
   price: string;
+  location?: string;
 }
 
 async function getProduct(id: string) {
@@ -41,19 +43,34 @@ export default async function EditProductPage({ params }: { params: { id: string
                 type="text" 
                 required 
                 defaultValue={product.sku}
-                className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none bg-slate-50 font-mono" 
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Product Name</label>
-              <input 
-                name="name" 
-                type="text" 
-                required 
-                defaultValue={product.name}
-                className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-              />
+              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Rack Location</label>
+              <div className="relative">
+                <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 w-3.5 h-3.5" />
+                <input 
+                  name="location" 
+                  type="text" 
+                  required 
+                  defaultValue={product.location || ''}
+                  placeholder="A-01-01"
+                  className="w-full border border-emerald-200 bg-emerald-50/30 p-2 pl-8 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-emerald-800" 
+                />
+              </div>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Product Name</label>
+            <input 
+              name="name" 
+              type="text" 
+              required 
+              defaultValue={product.name}
+              className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none" 
+            />
           </div>
 
           <div>
@@ -63,7 +80,7 @@ export default async function EditProductPage({ params }: { params: { id: string
               rows={3} 
               required 
               defaultValue={product.description}
-              className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none resize-none"
             ></textarea>
           </div>
 
@@ -74,20 +91,20 @@ export default async function EditProductPage({ params }: { params: { id: string
               type="number" 
               required 
               defaultValue={product.price}
-              className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+              className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none" 
             />
           </div>
 
           <div className="pt-4 flex gap-3">
             <Link 
               href={`/history/${product.id}`} 
-              className="flex-1 text-center bg-slate-100 text-slate-600 py-2.5 rounded hover:bg-slate-200 transition text-sm font-bold"
+              className="flex-1 text-center bg-slate-100 text-slate-600 py-2.5 rounded-lg hover:bg-slate-200 transition text-sm font-bold"
             >
               Cancel
             </Link>
             <button 
               type="submit" 
-              className="flex-1 bg-blue-600 text-white py-2.5 rounded hover:bg-blue-700 transition font-bold text-sm"
+              className="flex-1 bg-slate-900 text-white py-2.5 rounded-lg hover:bg-slate-800 transition font-bold text-sm"
             >
               Save Changes
             </button>

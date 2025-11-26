@@ -9,13 +9,15 @@ export async function createProduct(formData: FormData) {
   const sku = formData.get('sku') as string;
   const description = formData.get('description') as string;
   const price = formData.get('price');
+  const location = formData.get('location') as string;
   const image_url = "https://placehold.co/600x400?text=No+Image"; 
 
   try {
     await pool.query(
-      `INSERT INTO products (name, sku, description, price, image_url, stock)
-       VALUES ($1, $2, $3, $4, $5, 0)`,
-      [name, sku, description, price, image_url]
+      // ⬅️ Perubahan: Tambahkan 'location' ke query INSERT
+      `INSERT INTO products (name, sku, description, price, location, image_url, stock)
+       VALUES ($1, $2, $3, $4, $5, $6, 0)`,
+      [name, sku, description, price, location, image_url]
     );
   } catch (error) {
     console.error('Create Error:', error);
@@ -31,11 +33,12 @@ export async function editProduct(id: number, formData: FormData) {
   const sku = formData.get('sku') as string;
   const description = formData.get('description') as string;
   const price = formData.get('price');
+  const location = formData.get('location') as string;
 
   try {
     await pool.query(
-      `UPDATE products SET name = $1, sku = $2, description = $3, price = $4 WHERE id = $5`,
-      [name, sku, description, price, id]
+      `UPDATE products SET name = $1, sku = $2, description = $3, price = $4, location = $5 WHERE id = $6`,
+      [name, sku, description, price, location, id]
     );
   } catch (error) {
     console.error('Edit Error:', error);
@@ -48,15 +51,22 @@ export async function editProduct(id: number, formData: FormData) {
 }
 
 export async function deleteProduct(id: number) {
+  const client = await pool.connect();
+
   try {
-    await pool.query('DELETE FROM stock_movements WHERE product_id = $1', [id]);
-    await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    await client.query('BEGIN');
+    await client.query('DELETE FROM stock_movements WHERE product_id = $1', [id]);
+    await client.query('DELETE FROM products WHERE id = $1', [id]);
+    await client.query('COMMIT');
     
     revalidatePath('/');
     return { success: true, message: 'Product deleted successfully' };
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Delete Error:', error);
     return { success: false, message: 'Failed to delete product' };
+  } finally {
+    client.release();
   }
 }
 
@@ -77,26 +87,28 @@ export async function updateStock(prevState: any, formData: FormData) {
 
   try {
     await client.query('BEGIN');
-    if (type === 'OUT') {
-      const res = await client.query('SELECT stock FROM products WHERE id = $1', [productId]);
-      const currentStock = res.rows[0]?.stock || 0;
+    
+    const res = await client.query('SELECT stock FROM products WHERE id = $1', [productId]);
+    const currentStock = res.rows[0]?.stock || 0;
 
+    if (type === 'OUT') {
       if (currentStock < quantity) {
         await client.query('ROLLBACK');
         return { success: false, message: `Stok tidak cukup! Sisa: ${currentStock}` };
       }
     }
+    
+    const newStock = type === 'IN' ? currentStock + quantity : currentStock - quantity;
 
     await client.query(
-      `INSERT INTO stock_movements (product_id, type, quantity, notes)
-       VALUES ($1, $2, $3, $4)`,
-      [productId, type, quantity, notes]
+      `INSERT INTO stock_movements (product_id, type, quantity, notes, ending_stock)
+       VALUES ($1, $2, $3, $4, $5)`, 
+      [productId, type, quantity, notes, newStock]
     );
 
-    const operator = type === 'IN' ? '+' : '-';
     await client.query(
-      `UPDATE products SET stock = stock ${operator} $1 WHERE id = $2`,
-      [quantity, productId]
+      `UPDATE products SET stock = $1 WHERE id = $2`, 
+      [newStock, productId]
     );
 
     await client.query('COMMIT'); 

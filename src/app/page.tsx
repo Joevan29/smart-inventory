@@ -6,7 +6,7 @@ import Pagination from './components/Pagination';
 import StockChart from './components/StockChart';
 import { DataTable } from './components/table/data-table';
 import { columns } from './components/table/columns';
-import { Plus, DollarSign, Package, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Plus, DollarSign, Package, AlertTriangle, TrendingUp, ArrowUpRight } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -32,7 +32,11 @@ async function getStats(): Promise<DashboardStats> {
       SUM(CASE WHEN stock < 10 THEN 1 ELSE 0 END) as low_stock_alert
     FROM products
   `);
-  return res.rows[0] as DashboardStats;
+  return {
+    total_sku: Number(res.rows[0].total_sku || 0),
+    total_valuation: Number(res.rows[0].total_valuation || 0),
+    low_stock_alert: Number(res.rows[0].low_stock_alert || 0),
+  } as DashboardStats;
 }
 
 async function getChartData() {
@@ -93,15 +97,15 @@ const formatCurrency = (value: string | number) => {
 };
 
 type Props = {
-  searchParams?: Promise<{
+  searchParams?: {
     query?: string;
     page?: string;
-  }>;
+  };
 };
 
 export default async function Home(props: Props) {
   const session = await auth();
-  const searchParams = await props.searchParams;
+  const searchParams = props.searchParams;
   const query = searchParams?.query || '';
   const currentPage = Number(searchParams?.page) || 1;
   
@@ -111,12 +115,13 @@ export default async function Home(props: Props) {
     getStats(),
     getChartData()
   ]);
+  
+  const lowStockPercentage = Math.min((stats.low_stock_alert / (stats.total_sku || 1)) * 100, 100);
 
   return (
     <main className="min-h-screen bg-slate-50/50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header Section */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">WMS Enterprise Dashboard</h1>
@@ -149,7 +154,7 @@ export default async function Home(props: Props) {
                   <DollarSign className="w-3 h-3" /> Total Valuation
                 </h3>
                 <p className="text-3xl font-extrabold text-emerald-950 tracking-tight mt-2">
-                  {formatCurrency(stats.total_valuation || 0)}
+                  {formatCurrency(stats.total_valuation)}
                 </p>
                 <div className="mt-3 flex items-center gap-1.5 text-emerald-700 text-xs font-bold bg-white/60 border border-emerald-100 w-fit px-2.5 py-1 rounded-full backdrop-blur-sm">
                   <TrendingUp className="w-3 h-3" />
@@ -181,35 +186,45 @@ export default async function Home(props: Props) {
             <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-blue-100/30 rounded-full blur-2xl group-hover:bg-blue-200/40 transition-all"></div>
           </div>
 
-          <div className={`p-6 rounded-xl shadow-sm border relative overflow-hidden transition-all duration-300 hover:shadow-md ${Number(stats.low_stock_alert) > 0 ? 'bg-gradient-to-br from-white to-rose-50/80 border-rose-200' : 'bg-white border-slate-200'}`}>
+          <div className={`p-6 rounded-xl shadow-sm border relative overflow-hidden transition-all duration-300 hover:shadow-md ${stats.low_stock_alert > 0 ? 'bg-gradient-to-br from-white to-rose-50/80 border-rose-200' : 'bg-white border-slate-200'}`}>
             <div className="relative z-10 flex justify-between items-start">
               <div className="w-full">
-                <h3 className={`${Number(stats.low_stock_alert) > 0 ? 'text-rose-700' : 'text-slate-500'} text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1`}>
+                <h3 className={`${stats.low_stock_alert > 0 ? 'text-rose-700' : 'text-slate-500'} text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1`}>
                   <AlertTriangle className="w-3 h-3" /> Low Stock Alert
                 </h3>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <p className={`text-3xl font-extrabold tracking-tight ${Number(stats.low_stock_alert) > 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+                  <p className={`text-3xl font-extrabold tracking-tight ${stats.low_stock_alert > 0 ? 'text-rose-700' : 'text-slate-900'}`}>
                     {stats.low_stock_alert}
                   </p>
                   <span className="text-sm font-medium text-slate-500">Items need attention</span>
                 </div>
                 
-                {Number(stats.low_stock_alert) > 0 && (
+                {stats.low_stock_alert > 0 && (
                   <div className="mt-4 w-full bg-rose-100 h-2 rounded-full overflow-hidden">
                     <div 
                       className="bg-rose-500 h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${Math.min((Number(stats.low_stock_alert) / Number(stats.total_sku || 1)) * 100, 100)}%` }}
+                      style={{ width: `${lowStockPercentage}%` }}
                     ></div>
                   </div>
                 )}
               </div>
-              {Number(stats.low_stock_alert) > 0 && (
+              {stats.low_stock_alert > 0 && (
                 <div className="p-3 bg-rose-100/50 rounded-lg text-rose-600 group-hover:animate-pulse">
                   <AlertTriangle className="w-6 h-6" />
                 </div>
               )}
             </div>
           </div>
+        </section>
+        
+        <section className="flex justify-start pt-2">
+            <Link 
+              href="/outbound" 
+              className="inline-flex items-center gap-2 text-rose-600 bg-rose-50 border border-rose-200 px-4 py-2.5 rounded-lg text-xs font-bold hover:bg-rose-100 transition-all shadow-sm active:scale-95"
+            >
+              <ArrowUpRight className="w-4 h-4" />
+              Fulfill Outbound Orders (Bulk)
+            </Link>
         </section>
 
         {!query && chartData.length > 0 && (

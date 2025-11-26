@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import DeleteButton from '../../components/DeleteButton';
 import TransactionForm from '../../components/TransactionForm';
+import { MapPin, Package, DollarSign, Pencil, Eye } from 'lucide-react';
 
 interface HistoryLog {
   id: number;
@@ -10,6 +11,7 @@ interface HistoryLog {
   quantity: number;
   notes: string;
   created_at: Date;
+  ending_stock?: number;
 }
 
 interface ProductDetail {
@@ -18,6 +20,7 @@ interface ProductDetail {
   sku: string;
   stock: number;
   price: string;
+  location?: string;
 }
 
 async function getProduct(id: string) {
@@ -26,6 +29,7 @@ async function getProduct(id: string) {
 }
 
 async function getHistory(id: string) {
+  // Ambil ending_stock
   const res = await pool.query(
     'SELECT * FROM stock_movements WHERE product_id = $1 ORDER BY created_at DESC',
     [id]
@@ -40,35 +44,78 @@ export default async function HistoryPage({ params }: { params: { id: string } }
 
   if (!product) return notFound();
 
+  const formatCurrency = (value: string | number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(Number(value));
+  };
+
   return (
-    <main className="min-h-screen bg-slate-50 p-8">
-      <div className="max-w-6xl mx-auto">
+    <main className="min-h-screen bg-slate-50 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
         
         <div className="mb-8">
           <Link href="/" className="text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-2 mb-4 transition-colors">
             &larr; Back to Dashboard
           </Link>
           
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded border border-blue-200">
-                  SKU: {product.sku}
-                </span>
-                <span className="text-xs text-slate-400 font-mono">ID: {product.id}</span>
+          <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 flex flex-col xl:flex-row justify-between items-start gap-8">
+            <div className="flex-1 w-full space-y-6">
+              {/* Header Produk */}
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{product.name}</h1>
+                <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
+                    <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-0.5 rounded tracking-wide border border-blue-100">
+                      SKU: {product.sku}
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">ID: {product.id}</span>
+                </div>
               </div>
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{product.name}</h1>
-              <p className="text-slate-500 mt-1 text-sm">Base Price: Rp {Number(product.price).toLocaleString('id-ID')}</p>
+
+              {/* Detail Info */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-b border-slate-100 py-4">
+                <div className="flex items-center gap-3">
+                    <DollarSign className="w-5 h-5 text-slate-500" />
+                    <div>
+                        <p className="text-xs text-slate-400 uppercase font-bold">Base Price</p>
+                        <p className="font-semibold text-slate-700">{formatCurrency(product.price)}</p>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    <MapPin className="w-5 h-5 text-slate-500" />
+                    <div>
+                        <p className="text-xs text-slate-400 uppercase font-bold">Rack Location</p>
+                        <p className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md inline-block">{product.location || 'N/A'}</p>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5 text-slate-500" />
+                    <div>
+                        <p className="text-xs text-slate-400 uppercase font-bold">Total Valuation</p>
+                        <p className="font-semibold text-slate-700">{formatCurrency(Number(product.price) * product.stock)}</p>
+                    </div>
+                </div>
+              </div>
               
-              <div className="flex gap-2 mt-6">
+              <div>
+                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Description</p>
+                <p className="text-sm text-slate-600 italic">
+                    {product.description || 'Tidak ada deskripsi produk. Mohon diperbarui di halaman Edit.'}
+                </p>
+              </div>
+
+
+              {/* Aksi */}
+              <div className="flex gap-2 pt-4 border-t border-slate-100">
                 <Link 
                   href={`/edit/${id}`}
-                  className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold transition border border-slate-200"
+                  className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-4 py-2.5 rounded-lg text-xs font-bold transition border border-slate-200"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                    <path d="M5.433 13.917l1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
-                    <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
-                  </svg>
+                  <Pencil className="w-4 h-4" />
                   Edit Info
                 </Link>
 
@@ -77,7 +124,7 @@ export default async function HistoryPage({ params }: { params: { id: string } }
                 <a 
                   href={`/api/export/${id}`} 
                   target="_blank"
-                  className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm"
+                  className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-md"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                     <path fillRule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Z" clipRule="evenodd" />
@@ -87,10 +134,11 @@ export default async function HistoryPage({ params }: { params: { id: string } }
               </div>
             </div>
             
-            <div className="w-full md:w-80 flex-shrink-0 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                <div className="text-right mb-4">
+            {/* Form Transaksi di Samping */}
+            <div className="w-full xl:w-96 flex-shrink-0">
+                <div className="text-right mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-inner">
                     <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Stock</span>
-                    <span className={`text-4xl font-extrabold ${product.stock < 10 ? 'text-red-600' : 'text-slate-900'}`}>
+                    <span className={`text-4xl font-extrabold ${product.stock < 10 ? 'text-rose-600' : 'text-slate-900'}`}>
                     {product.stock}
                     </span>
                 </div>
@@ -99,7 +147,7 @@ export default async function HistoryPage({ params }: { params: { id: string } }
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mt-8">
           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
             <div>
               <h2 className="font-bold text-slate-800">Audit Log & Transactions</h2>
@@ -110,53 +158,58 @@ export default async function HistoryPage({ params }: { params: { id: string } }
             </span>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+          <div className="overflow-x-auto max-h-[600px]">
+            <table className="w-full text-sm text-left border-collapse">
+              {/* Sticky Header untuk Log */}
+              <thead className="text-xs text-slate-500 uppercase bg-slate-50/95 backdrop-blur-sm font-semibold border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-4 font-semibold w-1/4">Date & Time</th>
-                  <th className="px-6 py-4 font-semibold w-1/6">Type</th>
-                  <th className="px-6 py-4 font-semibold w-1/6">Quantity</th>
-                  <th className="px-6 py-4 font-semibold">Reason / Notes</th>
+                  <th className="px-6 py-3.5">Date & Time</th>
+                  <th className="px-6 py-3.5">Type</th>
+                  <th className="px-6 py-3.5">Quantity</th>
+                  <th className="px-6 py-3.5 text-center">Ending Stock</th>
+                  <th className="px-6 py-3.5">Reason / Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {history.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center justify-center text-slate-400">
-                        <p>No transaction history available yet.</p>
-                      </div>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                      <p className="text-sm">No transaction history available yet.</p>
                     </td>
                   </tr>
                 ) : (
                   history.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 text-slate-600">
-                        <div className="font-medium text-slate-700">
+                    <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
+                        <div className="font-medium text-slate-700 text-xs">
                           {new Date(log.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </div>
-                        <div className="text-xs text-slate-400">
-                          {new Date(log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {new Date(log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border uppercase ${
                           log.type === 'IN' 
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
                             : 'bg-rose-50 text-rose-700 border-rose-100'
                         }`}>
-                          {log.type === 'IN' ? 'STOCK IN' : 'STOCK OUT'}
+                          {log.type}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`font-mono font-bold text-base ${
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`font-mono font-bold text-sm ${
                             log.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'
                         }`}>
                           {log.type === 'IN' ? '+' : '-'}{log.quantity}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-600">
+                      <td className="px-6 py-4 text-center">
+                        <span className="font-extrabold text-slate-800 text-lg">
+                          {log.ending_stock ?? '?'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 italic max-w-sm">
                         {log.notes}
                       </td>
                     </tr>

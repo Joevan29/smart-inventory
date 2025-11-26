@@ -1,23 +1,9 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config";
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get('wms_session');
-  
-  const isLoginPage = request.nextUrl.pathname === '/login';
-  const isPublicFile = request.nextUrl.pathname.includes('.');
-
-  if (!session && !isLoginPage && !isPublicFile) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  if (session && isLoginPage) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-
-  return NextResponse.next();
-}
+export default NextAuth(authConfig).auth;
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
