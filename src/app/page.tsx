@@ -1,10 +1,12 @@
-import pool from '@/src/lib/db';
+import pool from '../lib/db';
 import Link from 'next/link';
-import { auth, signOut } from '@/src/auth';
+import { auth, signOut } from '../auth';
 import Search from './components/Search';
 import Pagination from './components/Pagination';
 import StockChart from './components/StockChart';
-import TransactionForm from './components/TransactionForm';
+import { DataTable } from './components/table/data-table';
+import { columns } from './components/table/columns';
+import { Plus, DollarSign, Package, AlertTriangle, TrendingUp } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -43,12 +45,12 @@ async function getChartData() {
 }
 
 async function getProducts(query: string, currentPage: number): Promise<Product[]> {
-  const ITEMS_PER_PAGE = 5;
+  const ITEMS_PER_PAGE = 10; 
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   let text = `
     SELECT * FROM products 
-    ORDER BY id ASC
+    ORDER BY id DESC 
     LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
   `;
   let values: string[] = [];
@@ -57,7 +59,7 @@ async function getProducts(query: string, currentPage: number): Promise<Product[
     text = `
       SELECT * FROM products 
       WHERE name ILIKE $1 OR sku ILIKE $1 
-      ORDER BY id ASC
+      ORDER BY id DESC
       LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
     `;
     values = [`%${query}%`];
@@ -67,9 +69,8 @@ async function getProducts(query: string, currentPage: number): Promise<Product[
   return res.rows;
 }
 
-// 4. Menghitung Total Halaman untuk Pagination
 async function getTotalPages(query: string): Promise<number> {
-  const ITEMS_PER_PAGE = 5;
+  const ITEMS_PER_PAGE = 10;
   let text = 'SELECT COUNT(*) FROM products';
   let values: string[] = [];
 
@@ -90,7 +91,6 @@ const formatCurrency = (value: string | number) => {
     minimumFractionDigits: 0
   }).format(Number(value));
 };
-
 
 type Props = {
   searchParams?: Promise<{
@@ -113,13 +113,18 @@ export default async function Home(props: Props) {
   ]);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+    <main className="min-h-screen bg-slate-50/50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        {/* Header Section */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">WMS Enterprise Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
               Welcome back, <span className="font-medium text-slate-800">{session?.user?.name || 'Admin'}</span>
             </p>
           </div>
@@ -130,53 +135,80 @@ export default async function Home(props: Props) {
               await signOut();
             }}
           >
-            <button type="submit" className="text-sm font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-5 py-2.5 rounded-lg transition-all duration-200">
+            <button type="submit" className="text-sm font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-5 py-2.5 rounded-lg transition-all duration-200 border border-rose-100">
               Sign Out
             </button>
           </form>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-            <div className="relative z-10">
-              <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Asset Valuation</h3>
-              <p className="text-3xl font-extrabold text-slate-900 mt-3 tracking-tight">
-                {formatCurrency(stats.total_valuation || 0)}
-              </p>
-              <span className="text-xs text-emerald-600 flex items-center gap-1 mt-2 font-medium bg-emerald-50 w-fit px-2 py-1 rounded">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                Real-time Calculation
-              </span>
+          <div className="bg-gradient-to-br from-white to-emerald-50/50 p-6 rounded-xl shadow-sm border border-emerald-100/50 relative overflow-hidden group transition-all duration-300 hover:shadow-md">
+            <div className="relative z-10 flex justify-between items-start">
+              <div>
+                <h3 className="text-emerald-900/60 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3" /> Total Valuation
+                </h3>
+                <p className="text-3xl font-extrabold text-emerald-950 tracking-tight mt-2">
+                  {formatCurrency(stats.total_valuation || 0)}
+                </p>
+                <div className="mt-3 flex items-center gap-1.5 text-emerald-700 text-xs font-bold bg-white/60 border border-emerald-100 w-fit px-2.5 py-1 rounded-full backdrop-blur-sm">
+                  <TrendingUp className="w-3 h-3" />
+                  +2.5% growth
+                </div>
+              </div>
+              <div className="p-3 bg-emerald-100/50 rounded-lg text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                <DollarSign className="w-6 h-6" />
+              </div>
             </div>
-            <div className="absolute right-0 top-0 h-full w-1.5 bg-emerald-500 group-hover:w-2 transition-all"></div>
+            <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-emerald-100/30 rounded-full blur-2xl group-hover:bg-emerald-200/40 transition-all"></div>
+          </div>
+\
+          <div className="bg-gradient-to-br from-white to-blue-50/50 p-6 rounded-xl shadow-sm border border-blue-100/50 relative overflow-hidden group transition-all duration-300 hover:shadow-md">
+             <div className="relative z-10 flex justify-between items-start">
+              <div>
+                <h3 className="text-blue-900/60 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Package className="w-3 h-3" /> Active SKU
+                </h3>
+                <p className="text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
+                  {stats.total_sku}
+                </p>
+                <p className="text-xs text-slate-500 mt-1 font-medium">Total unique items</p>
+              </div>
+              <div className="p-3 bg-blue-100/50 rounded-lg text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                <Package className="w-6 h-6" />
+              </div>
+            </div>
+            <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-blue-100/30 rounded-full blur-2xl group-hover:bg-blue-200/40 transition-all"></div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-             <div className="relative z-10">
-              <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total SKU Registered</h3>
-              <p className="text-3xl font-extrabold text-slate-900 mt-3 tracking-tight">
-                {stats.total_sku} <span className="text-base font-normal text-slate-400">Items</span>
-              </p>
-              <span className="text-xs text-blue-600 mt-2 font-medium bg-blue-50 w-fit px-2 py-1 rounded inline-block">
-                Active Inventory
-              </span>
+          <div className={`p-6 rounded-xl shadow-sm border relative overflow-hidden transition-all duration-300 hover:shadow-md ${Number(stats.low_stock_alert) > 0 ? 'bg-gradient-to-br from-white to-rose-50/80 border-rose-200' : 'bg-white border-slate-200'}`}>
+            <div className="relative z-10 flex justify-between items-start">
+              <div className="w-full">
+                <h3 className={`${Number(stats.low_stock_alert) > 0 ? 'text-rose-700' : 'text-slate-500'} text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1`}>
+                  <AlertTriangle className="w-3 h-3" /> Low Stock Alert
+                </h3>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <p className={`text-3xl font-extrabold tracking-tight ${Number(stats.low_stock_alert) > 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+                    {stats.low_stock_alert}
+                  </p>
+                  <span className="text-sm font-medium text-slate-500">Items need attention</span>
+                </div>
+                
+                {Number(stats.low_stock_alert) > 0 && (
+                  <div className="mt-4 w-full bg-rose-100 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-rose-500 h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min((Number(stats.low_stock_alert) / Number(stats.total_sku || 1)) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                )}
+              </div>
+              {Number(stats.low_stock_alert) > 0 && (
+                <div className="p-3 bg-rose-100/50 rounded-lg text-rose-600 group-hover:animate-pulse">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+              )}
             </div>
-            <div className="absolute right-0 top-0 h-full w-1.5 bg-blue-500 group-hover:w-2 transition-all"></div>
-          </div>
-
-          <div className={`p-6 rounded-xl shadow-sm border relative overflow-hidden group hover:shadow-md transition-all duration-300 ${Number(stats.low_stock_alert) > 0 ? 'bg-red-50/50 border-red-200' : 'bg-white border-slate-200'}`}>
-            <div className="relative z-10">
-              <h3 className={`${Number(stats.low_stock_alert) > 0 ? 'text-red-600' : 'text-slate-500'} text-xs font-bold uppercase tracking-wider`}>
-                Low Stock Alert
-              </h3>
-              <p className={`text-3xl font-extrabold mt-3 tracking-tight ${Number(stats.low_stock_alert) > 0 ? 'text-red-700' : 'text-slate-900'}`}>
-                {stats.low_stock_alert} <span className="text-base font-normal opacity-70">Items</span>
-              </p>
-              <span className={`text-xs mt-2 font-medium px-2 py-1 rounded inline-block ${Number(stats.low_stock_alert) > 0 ? 'text-red-700 bg-red-100' : 'text-slate-500 bg-slate-100'}`}>
-                {Number(stats.low_stock_alert) > 0 ? 'Action Required' : 'Healthy Level'}
-              </span>
-            </div>
-             <div className={`absolute right-0 top-0 h-full w-1.5 group-hover:w-2 transition-all ${Number(stats.low_stock_alert) > 0 ? 'bg-red-500' : 'bg-slate-300'}`}></div>
           </div>
         </section>
 
@@ -186,88 +218,23 @@ export default async function Home(props: Props) {
           </section>
         )}
 
-        <section>
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="w-full max-w-md">
-              <Search placeholder="Search by Product Name or SKU..." />
+              <Search placeholder="Search by SKU, Product Name..." />
             </div>
-            <Link href="/add" className="w-full sm:w-auto bg-slate-900 text-white px-6 py-3 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors shadow-md flex items-center justify-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-              </svg>
+            <Link 
+              href="/add" 
+              className="w-full sm:w-auto bg-slate-900 text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
               Register New SKU
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {products.length === 0 ? (
-               <div className="text-center py-24 bg-white rounded-xl border-2 border-dashed border-slate-200">
-                 <div className="text-slate-300 mb-3">
-                   <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                 </div>
-                 <p className="text-slate-500 font-medium">No products found matching &quot;{query}&quot;.</p>
-                 {query && (
-                   <Link href="/" className="text-blue-600 text-sm hover:underline mt-2 inline-block">Clear search</Link>
-                 )}
-               </div>
-            ) : (
-              products.map((item) => (
-                <div key={item.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col md:flex-row gap-6 items-start md:items-center hover:border-blue-300 transition-colors duration-200">
-                  
-                  <div className="w-20 h-20 bg-slate-100 rounded-lg flex-shrink-0 overflow-hidden border border-slate-100 relative">
-                     <img 
-                       src={item.image_url || 'https://placehold.co/600x400?text=No+Image'} 
-                       alt={item.name} 
-                       className="w-full h-full object-cover opacity-95 hover:opacity-100 transition-opacity" 
-                     />
-                  </div>
+          <DataTable columns={columns} data={products} />
 
-                  <div className="flex-1 w-full min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-2">
-                      <div className="group">
-                        <Link href={`/history/${item.id}`} className="block">
-                          <h3 className="font-bold text-slate-900 text-lg group-hover:text-blue-600 transition-colors truncate pr-4">
-                            {item.name}
-                          </h3>
-                        </Link>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="bg-slate-100 text-slate-600 text-xs font-mono px-2 py-0.5 rounded border border-slate-200">
-                            {item.sku}
-                          </span>
-                          <span className="text-xs text-slate-400">•</span>
-                          <p className="text-xs text-slate-500 font-medium">
-                            Base Price: {formatCurrency(item.price)}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="text-left sm:text-right flex-shrink-0 bg-slate-50 sm:bg-transparent p-2 sm:p-0 rounded-lg">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">Available Stock</span>
-                        <span className={`block text-2xl font-extrabold tabular-nums ${item.stock < 10 ? 'text-red-600' : 'text-slate-800'}`}>
-                          {item.stock}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row gap-3 w-full pt-4 border-t border-slate-100">
-                      <div className="flex-1">
-                        <TransactionForm productId={item.id} type="IN" />
-                      </div>
-                      
-                      <div className="hidden sm:block w-px bg-slate-200 my-1"></div>
-
-                      <div className="flex-1">
-                        <TransactionForm productId={item.id} type="OUT" />
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="mt-10 border-t border-slate-200 pt-6">
+          <div className="flex justify-end pt-4">
             <Pagination totalPages={totalPages} />
           </div>
         </section>

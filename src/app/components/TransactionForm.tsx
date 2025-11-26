@@ -28,8 +28,8 @@ export default function TransactionForm({ productId, type }: Props) {
     <form 
       ref={formRef}
       action={formAction} 
-      className={`flex flex-1 gap-2 items-center p-1 rounded transition-colors ${
-        isPending ? 'opacity-50 cursor-not-allowed' : ''
+      className={`flex flex-1 gap-2 items-center p-1 rounded transition-all duration-200 ${
+        isPending ? 'opacity-50 pointer-events-none grayscale' : ''
       }`}
     >
       <input type="hidden" name="productId" value={productId} />
@@ -40,10 +40,10 @@ export default function TransactionForm({ productId, type }: Props) {
            name="quantity" 
            type="number" 
            placeholder="Qty" 
-           className={`w-full px-2 py-1.5 border rounded text-xs outline-none transition
+           className={`w-full px-2 py-1.5 border rounded text-xs outline-none transition-all shadow-sm
              ${isIncoming 
-               ? 'border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500' 
-               : 'border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+               ? 'border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-emerald-50/30' 
+               : 'border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 bg-rose-50/30'
              }`} 
            required 
            min="1"
@@ -55,10 +55,10 @@ export default function TransactionForm({ productId, type }: Props) {
         name="notes" 
         type="text" 
         placeholder={isIncoming ? "Source (e.g. Vendor)" : "Reason (e.g. Sales)"} 
-        className={`flex-[2] px-2 py-1.5 border rounded text-xs outline-none transition
+        className={`flex-[2] px-2 py-1.5 border rounded text-xs outline-none transition-all shadow-sm
           ${isIncoming 
-            ? 'border-slate-200 focus:border-emerald-500' 
-            : 'border-slate-200 focus:border-rose-500'
+            ? 'border-slate-200 focus:border-emerald-500 bg-emerald-50/30' 
+            : 'border-slate-200 focus:border-rose-500 bg-rose-50/30'
           }`} 
         required 
         disabled={isPending}
@@ -67,7 +67,7 @@ export default function TransactionForm({ productId, type }: Props) {
       <button 
         type="submit" 
         disabled={isPending}
-        className={`px-3 py-1.5 rounded text-xs font-bold text-white transition shadow-sm flex items-center justify-center min-w-[50px]
+        className={`px-3 py-1.5 rounded text-xs font-bold text-white transition-all shadow-sm flex items-center justify-center min-w-[50px] hover:shadow-md active:scale-95
           ${isIncoming 
             ? 'bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400' 
             : 'bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400'

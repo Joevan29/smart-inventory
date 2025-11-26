@@ -9,7 +9,7 @@ export async function createProduct(formData: FormData) {
   const sku = formData.get('sku') as string;
   const description = formData.get('description') as string;
   const price = formData.get('price');
-  const image_url = "https://placehold.co/600x400?text=No+Image";
+  const image_url = "https://placehold.co/600x400?text=No+Image"; 
 
   try {
     await pool.query(
@@ -24,6 +24,40 @@ export async function createProduct(formData: FormData) {
 
   revalidatePath('/');
   redirect('/');
+}
+
+export async function editProduct(id: number, formData: FormData) {
+  const name = formData.get('name') as string;
+  const sku = formData.get('sku') as string;
+  const description = formData.get('description') as string;
+  const price = formData.get('price');
+
+  try {
+    await pool.query(
+      `UPDATE products SET name = $1, sku = $2, description = $3, price = $4 WHERE id = $5`,
+      [name, sku, description, price, id]
+    );
+  } catch (error) {
+    console.error('Edit Error:', error);
+    return; 
+  }
+
+  revalidatePath('/');
+  revalidatePath(`/history/${id}`);
+  redirect(`/history/${id}`);
+}
+
+export async function deleteProduct(id: number) {
+  try {
+    await pool.query('DELETE FROM stock_movements WHERE product_id = $1', [id]);
+    await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    
+    revalidatePath('/');
+    return { success: true, message: 'Product deleted successfully' };
+  } catch (error) {
+    console.error('Delete Error:', error);
+    return { success: false, message: 'Failed to delete product' };
+  }
 }
 
 export async function updateStock(prevState: any, formData: FormData) {
