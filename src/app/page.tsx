@@ -1,12 +1,22 @@
 import pool from '../lib/db';
-import Link from 'next/link';
 import { auth, signOut } from '../auth'; 
 import Search from './components/Search';
 import Pagination from './components/Pagination';
 import StockChart from './components/StockChart';
 import { DataTable } from './components/table/data-table';
 import { columns } from './components/table/columns';
-import { Plus, DollarSign, Package, AlertTriangle, TrendingUp, ArrowUpRight } from 'lucide-react';
+import { 
+  Plus, 
+  DollarSign, 
+  Package, 
+  AlertTriangle, 
+  ArrowUpRight, 
+  TrendingUp,
+  Box,
+  LayoutDashboard,
+  Search as SearchIcon
+} from 'lucide-react';
+import Link from 'next/link';
 
 interface Product {
   id: number;
@@ -16,6 +26,7 @@ interface Product {
   stock: number;
   price: string;
   image_url: string;
+  location?: string;
 }
 
 interface DashboardStats {
@@ -43,20 +54,16 @@ async function getChartData() {
   const res = await pool.query(`
     SELECT name, stock FROM products 
     ORDER BY stock DESC 
-    LIMIT 10
+    LIMIT 5 -- UBAH JADI 5 AGAR GRAFIK TIDAK TERLALU PADAT
   `);
   return res.rows;
 }
 
 async function getProducts(query: string, currentPage: number): Promise<Product[]> {
-  const ITEMS_PER_PAGE = 10; 
+  const ITEMS_PER_PAGE = 7;
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
-  let text = `
-    SELECT * FROM products 
-    ORDER BY id DESC 
-    LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
-  `;
+  let text = `SELECT * FROM products ORDER BY id DESC LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}`;
   let values: string[] = [];
 
   if (query) {
@@ -74,7 +81,7 @@ async function getProducts(query: string, currentPage: number): Promise<Product[
 }
 
 async function getTotalPages(query: string): Promise<number> {
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 7; // Samakan dengan diatas
   let text = 'SELECT COUNT(*) FROM products';
   let values: string[] = [];
 
@@ -105,9 +112,7 @@ type Props = {
 
 export default async function Home(props: Props) {
   const session = await auth();
-  
   const searchParams = await props.searchParams;
-  
   const query = searchParams?.query || '';
   const currentPage = Number(searchParams?.page) || 1;
   
@@ -117,144 +122,176 @@ export default async function Home(props: Props) {
     getStats(),
     getChartData()
   ]);
-  
-  const lowStockPercentage = Math.min((stats.low_stock_alert / (stats.total_sku || 1)) * 100, 100);
 
   return (
-    <main className="min-h-screen bg-slate-50/50 p-4 md:p-8 font-sans text-slate-900">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <main className="min-h-screen bg-slate-50/50 font-sans text-slate-900 pb-20">
+      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-900 text-white p-2 rounded-lg shadow-md">
+              <LayoutDashboard className="w-5 h-5" />
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="text-lg font-bold text-slate-900 leading-tight">WMS Enterprise</h1>
+              <p className="text-xs text-slate-500">Inventory Dashboard</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2 text-xs font-medium text-slate-600 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span>System Operational</span>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-slate-800">{session?.user?.name || 'Administrator'}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Super Admin</p>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-slate-800 to-slate-600 flex items-center justify-center text-white text-sm font-bold shadow-md border-2 border-white">
+                {session?.user?.name?.charAt(0) || 'A'}
+              </div>
+              <form
+                action={async () => {
+                  "use server";
+                  await signOut();
+                }}
+              >
+                <button className="text-xs font-bold text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-md transition-colors">
+                  Sign Out
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 space-y-8">
         
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">WMS Enterprise Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              Welcome back, <span className="font-medium text-slate-800">{session?.user?.name || 'Admin'}</span>
-            </p>
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm card-hover group relative overflow-hidden col-span-1 md:col-span-2">
+            <div className="relative z-10 flex flex-col justify-between h-full">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <span className="text-emerald-700 bg-emerald-50/80 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-emerald-100">
+                  <TrendingUp className="w-3 h-3" /> +2.4%
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500 mb-1">Total Inventory Valuation</p>
+                <h3 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                  {formatCurrency(stats.total_valuation)}
+                </h3>
+              </div>
+            </div>
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-50 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity"></div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm card-hover relative overflow-hidden">
+            <div className="flex flex-col h-full justify-between relative z-10">
+              <div className="p-2 w-fit bg-blue-50 text-blue-600 rounded-xl border border-blue-100 mb-4">
+                <Box className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500 mb-1">Active SKU</p>
+                <h3 className="text-2xl font-extrabold text-slate-900">
+                  {stats.total_sku} <span className="text-sm font-medium text-slate-400">Items</span>
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          <div className={`p-5 rounded-2xl border shadow-sm card-hover relative overflow-hidden ${stats.low_stock_alert > 0 ? 'bg-white border-rose-200' : 'bg-white border-slate-200'}`}>
+            <div className="flex flex-col h-full justify-between relative z-10">
+              <div className={`p-2 w-fit rounded-xl border mb-4 ${stats.low_stock_alert > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className={`text-sm font-medium mb-1 ${stats.low_stock_alert > 0 ? 'text-rose-600' : 'text-slate-500'}`}>Low Stock Alerts</p>
+                <h3 className={`text-2xl font-extrabold ${stats.low_stock_alert > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                  {stats.low_stock_alert} <span className="text-sm font-medium opacity-60">Items</span>
+                </h3>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex-1 w-full">
+             <Search placeholder="Search products by Name, SKU..." />
           </div>
           
-          <form
-            action={async () => {
-              "use server";
-              await signOut();
-            }}
-          >
-            <button type="submit" className="text-sm font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-5 py-2.5 rounded-lg transition-all duration-200 border border-rose-100">
-              Sign Out
-            </button>
-          </form>
-        </header>
-
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-white to-emerald-50/50 p-6 rounded-xl shadow-sm border border-emerald-100/50 relative overflow-hidden group transition-all duration-300 hover:shadow-md">
-            <div className="relative z-10 flex justify-between items-start">
-              <div>
-                <h3 className="text-emerald-900/60 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <DollarSign className="w-3 h-3" /> Total Valuation
-                </h3>
-                <p className="text-3xl font-extrabold text-emerald-950 tracking-tight mt-2">
-                  {formatCurrency(stats.total_valuation)}
-                </p>
-                <div className="mt-3 flex items-center gap-1.5 text-emerald-700 text-xs font-bold bg-white/60 border border-emerald-100 w-fit px-2.5 py-1 rounded-full backdrop-blur-sm">
-                  <TrendingUp className="w-3 h-3" />
-                  +2.5% growth
-                </div>
-              </div>
-              <div className="p-3 bg-emerald-100/50 rounded-lg text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                <DollarSign className="w-6 h-6" />
-              </div>
-            </div>
-            <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-emerald-100/30 rounded-full blur-2xl group-hover:bg-emerald-200/40 transition-all"></div>
-          </div>
-
-          <div className="bg-gradient-to-br from-white to-blue-50/50 p-6 rounded-xl shadow-sm border border-blue-100/50 relative overflow-hidden group transition-all duration-300 hover:shadow-md">
-             <div className="relative z-10 flex justify-between items-start">
-              <div>
-                <h3 className="text-blue-900/60 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Package className="w-3 h-3" /> Active SKU
-                </h3>
-                <p className="text-3xl font-extrabold text-slate-900 tracking-tight mt-2">
-                  {stats.total_sku}
-                </p>
-                <p className="text-xs text-slate-500 mt-1 font-medium">Total unique items</p>
-              </div>
-              <div className="p-3 bg-blue-100/50 rounded-lg text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                <Package className="w-6 h-6" />
-              </div>
-            </div>
-            <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-blue-100/30 rounded-full blur-2xl group-hover:bg-blue-200/40 transition-all"></div>
-          </div>
-
-          <div className={`p-6 rounded-xl shadow-sm border relative overflow-hidden transition-all duration-300 hover:shadow-md ${stats.low_stock_alert > 0 ? 'bg-gradient-to-br from-white to-rose-50/80 border-rose-200' : 'bg-white border-slate-200'}`}>
-            <div className="relative z-10 flex justify-between items-start">
-              <div className="w-full">
-                <h3 className={`${stats.low_stock_alert > 0 ? 'text-rose-700' : 'text-slate-500'} text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1`}>
-                  <AlertTriangle className="w-3 h-3" /> Low Stock Alert
-                </h3>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <p className={`text-3xl font-extrabold tracking-tight ${stats.low_stock_alert > 0 ? 'text-rose-700' : 'text-slate-900'}`}>
-                    {stats.low_stock_alert}
-                  </p>
-                  <span className="text-sm font-medium text-slate-500">Items need attention</span>
-                </div>
-                
-                {stats.low_stock_alert > 0 && (
-                  <div className="mt-4 w-full bg-rose-100 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-rose-500 h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${lowStockPercentage}%` }}
-                    ></div>
-                  </div>
-                )}
-              </div>
-              {stats.low_stock_alert > 0 && (
-                <div className="p-3 bg-rose-100/50 rounded-lg text-rose-600 group-hover:animate-pulse">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-        
-        <section className="flex justify-start pt-2">
+          <div className="flex gap-2 shrink-0">
             <Link 
               href="/outbound" 
-              className="inline-flex items-center gap-2 text-rose-600 bg-rose-50 border border-rose-200 px-4 py-2.5 rounded-lg text-xs font-bold hover:bg-rose-100 transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95"
             >
               <ArrowUpRight className="w-4 h-4" />
-              Fulfill Outbound Orders (Bulk)
+              Bulk Outbound
             </Link>
-        </section>
-
-        {!query && chartData.length > 0 && (
-          <section>
-            <StockChart data={chartData} />
-          </section>
-        )}
-
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <div className="w-full max-w-md">
-              <Search placeholder="Search by SKU, Product Name..." />
-            </div>
+            
             <Link 
               href="/add" 
-              className="w-full sm:w-auto bg-slate-900 text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              Register New SKU
+              Add Product
             </Link>
           </div>
-
-          <DataTable columns={columns} data={products} />
-
-          <div className="flex justify-end pt-4">
-            <Pagination totalPages={totalPages} />
-          </div>
         </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          
+          <section className="lg:col-span-2 space-y-4 min-w-0">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-bold text-slate-800">Inventory List</h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
+                  Page {currentPage}
+                </span>
+              </div>
+              <DataTable columns={columns} data={products} />
+            </div>
+            <div className="flex justify-center">
+               <Pagination totalPages={totalPages} />
+            </div>
+          </section>
+
+          {/* --- Analytics Chart (1/3 width) --- */}
+          <section className="lg:col-span-1 space-y-6 min-w-0">
+             {/* Chart Container */}
+             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+               <div className="mb-4">
+                 <h3 className="font-bold text-slate-800">Inventory Overview</h3>
+                 <p className="text-xs text-slate-500">Top products by available quantity</p>
+               </div>
+               
+               <div className="h-[300px] w-full"> 
+                 {chartData.length > 0 ? (
+                   <StockChart data={chartData} />
+                 ) : (
+                   <div className="h-full flex items-center justify-center text-slate-400 text-sm italic bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                     No data available for chart
+                   </div>
+                 )}
+               </div>
+             </div>
+
+             <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-5 text-white shadow-lg shadow-indigo-500/20 relative overflow-hidden">
+                <div className="relative z-10">
+                  <h4 className="font-bold text-base mb-2 flex items-center gap-2">
+                    <span className="bg-white/20 p-1 rounded">💡</span> Pro Tip
+                  </h4>
+                  <p className="text-indigo-100 text-xs leading-relaxed">
+                    Gunakan fitur <strong>Bulk Outbound</strong> untuk memproses banyak pesanan sekaligus dan menghemat waktu operasional gudang Anda.
+                  </p>
+                </div>
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-10 rounded-full blur-2xl"></div>
+             </div>
+          </section>
+        </div>
 
       </div>
     </main>
