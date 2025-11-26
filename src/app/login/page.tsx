@@ -2,7 +2,7 @@ import { signIn } from "@/src/auth";
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+    <main className="min-h-screen flex items-center justify-center bg-slate-50/50 p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
         <div className="text-center mb-8">
           <div className="bg-slate-900 w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -28,7 +28,7 @@ export default function LoginPage() {
               type="email"
               required
               placeholder="admin@wms.com"
-              className="w-full border border-slate-300 p-3 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none transition"
+              className="w-full border border-slate-300 bg-slate-50 p-3 rounded-lg text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition font-medium"
             />
           </div>
           
@@ -39,7 +39,7 @@ export default function LoginPage() {
               type="password"
               required
               placeholder="•••••"
-              className="w-full border border-slate-300 p-3 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none transition"
+              className="w-full border border-slate-300 bg-slate-50 p-3 rounded-lg text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition font-medium"
             />
           </div>
 

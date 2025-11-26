@@ -1,7 +1,8 @@
-import pool from '@/src/lib/db';
+import pool from '../../../lib/db';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import DeleteButton from '@/src/app/components/DeleteButton';
+import DeleteButton from '../../components/DeleteButton';
+import TransactionForm from '../../components/TransactionForm';
 
 interface HistoryLog {
   id: number;
@@ -41,15 +42,15 @@ export default async function HistoryPage({ params }: { params: { id: string } }
 
   return (
     <main className="min-h-screen bg-slate-50 p-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         
         <div className="mb-8">
           <Link href="/" className="text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-2 mb-4 transition-colors">
             &larr; Back to Dashboard
           </Link>
           
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-            <div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start gap-6">
+            <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded border border-blue-200">
                   SKU: {product.sku}
@@ -58,17 +59,8 @@ export default async function HistoryPage({ params }: { params: { id: string } }
               </div>
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{product.name}</h1>
               <p className="text-slate-500 mt-1 text-sm">Base Price: Rp {Number(product.price).toLocaleString('id-ID')}</p>
-            </div>
-            
-            <div className="flex flex-col items-end gap-3">
-              <div className="text-right">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Stock</span>
-                <span className={`text-4xl font-extrabold ${product.stock < 10 ? 'text-red-600' : 'text-slate-900'}`}>
-                  {product.stock}
-                </span>
-              </div>
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-6">
                 <Link 
                   href={`/edit/${id}`}
                   className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold transition border border-slate-200"
@@ -93,6 +85,16 @@ export default async function HistoryPage({ params }: { params: { id: string } }
                   Download Report
                 </a>
               </div>
+            </div>
+            
+            <div className="w-full md:w-80 flex-shrink-0 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <div className="text-right mb-4">
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Stock</span>
+                    <span className={`text-4xl font-extrabold ${product.stock < 10 ? 'text-red-600' : 'text-slate-900'}`}>
+                    {product.stock}
+                    </span>
+                </div>
+                <TransactionForm productId={product.id} stock={product.stock} />
             </div>
           </div>
         </div>

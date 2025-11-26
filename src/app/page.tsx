@@ -1,6 +1,6 @@
 import pool from '../lib/db';
 import Link from 'next/link';
-import { auth, signOut } from '../auth';
+import { auth, signOut } from '../auth'; 
 import Search from './components/Search';
 import Pagination from './components/Pagination';
 import StockChart from './components/StockChart';
@@ -162,7 +162,7 @@ export default async function Home(props: Props) {
             </div>
             <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-emerald-100/30 rounded-full blur-2xl group-hover:bg-emerald-200/40 transition-all"></div>
           </div>
-\
+
           <div className="bg-gradient-to-br from-white to-blue-50/50 p-6 rounded-xl shadow-sm border border-blue-100/50 relative overflow-hidden group transition-all duration-300 hover:shadow-md">
              <div className="relative z-10 flex justify-between items-start">
               <div>
