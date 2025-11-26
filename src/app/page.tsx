@@ -97,15 +97,17 @@ const formatCurrency = (value: string | number) => {
 };
 
 type Props = {
-  searchParams?: {
+  searchParams: Promise<{
     query?: string;
     page?: string;
-  };
+  }>;
 };
 
 export default async function Home(props: Props) {
   const session = await auth();
-  const searchParams = props.searchParams;
+  
+  const searchParams = await props.searchParams;
+  
   const query = searchParams?.query || '';
   const currentPage = Number(searchParams?.page) || 1;
   

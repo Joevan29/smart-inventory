@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import DeleteButton from '../../components/DeleteButton';
 import TransactionForm from '../../components/TransactionForm';
-import { MapPin, Package, DollarSign, Pencil, Eye } from 'lucide-react';
+import { MapPin, Package, DollarSign, Pencil } from 'lucide-react';
 
 interface HistoryLog {
   id: number;
@@ -21,6 +21,7 @@ interface ProductDetail {
   stock: number;
   price: string;
   location?: string;
+  description?: string;
 }
 
 async function getProduct(id: string) {
@@ -29,16 +30,19 @@ async function getProduct(id: string) {
 }
 
 async function getHistory(id: string) {
-  // Ambil ending_stock
   const res = await pool.query(
     'SELECT * FROM stock_movements WHERE product_id = $1 ORDER BY created_at DESC',
     [id]
   );
   return res.rows as HistoryLog[];
 }
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
-export default async function HistoryPage({ params }: { params: { id: string } }) {
+export default async function HistoryPage({ params }: Props) {
   const { id } = await params;
+  
   const product = await getProduct(id);
   const history = await getHistory(id);
 
@@ -63,7 +67,6 @@ export default async function HistoryPage({ params }: { params: { id: string } }
           
           <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 flex flex-col xl:flex-row justify-between items-start gap-8">
             <div className="flex-1 w-full space-y-6">
-              {/* Header Produk */}
               <div>
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{product.name}</h1>
                 <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
@@ -74,7 +77,6 @@ export default async function HistoryPage({ params }: { params: { id: string } }
                 </div>
               </div>
 
-              {/* Detail Info */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-b border-slate-100 py-4">
                 <div className="flex items-center gap-3">
                     <DollarSign className="w-5 h-5 text-slate-500" />
@@ -109,7 +111,6 @@ export default async function HistoryPage({ params }: { params: { id: string } }
               </div>
 
 
-              {/* Aksi */}
               <div className="flex gap-2 pt-4 border-t border-slate-100">
                 <Link 
                   href={`/edit/${id}`}
@@ -134,7 +135,7 @@ export default async function HistoryPage({ params }: { params: { id: string } }
               </div>
             </div>
             
-            {/* Form Transaksi di Samping */}
+            {/* Form Transaksi */}
             <div className="w-full xl:w-96 flex-shrink-0">
                 <div className="text-right mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-inner">
                     <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Stock</span>
@@ -148,6 +149,7 @@ export default async function HistoryPage({ params }: { params: { id: string } }
         </div>
 
         <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mt-8">
+          {/* Audit Log Section (sama seperti sebelumnya) */}
           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
             <div>
               <h2 className="font-bold text-slate-800">Audit Log & Transactions</h2>
@@ -160,7 +162,6 @@ export default async function HistoryPage({ params }: { params: { id: string } }
           
           <div className="overflow-x-auto max-h-[600px]">
             <table className="w-full text-sm text-left border-collapse">
-              {/* Sticky Header untuk Log */}
               <thead className="text-xs text-slate-500 uppercase bg-slate-50/95 backdrop-blur-sm font-semibold border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-3.5">Date & Time</th>

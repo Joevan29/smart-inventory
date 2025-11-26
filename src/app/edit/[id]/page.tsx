@@ -18,8 +18,13 @@ async function getProduct(id: string) {
   return res.rows[0] as ProductDetail;
 }
 
-export default async function EditProductPage({ params }: { params: { id: string } }) {
+interface Props {
+  params: Promise<{ id: string }>;
+}
+
+export default async function EditProductPage({ params }: Props) {
   const { id } = await params;
+  
   const product = await getProduct(id);
 
   if (!product) return notFound();

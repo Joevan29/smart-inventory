@@ -14,7 +14,6 @@ export async function createProduct(formData: FormData) {
 
   try {
     await pool.query(
-      // ⬅️ Perubahan: Tambahkan 'location' ke query INSERT
       `INSERT INTO products (name, sku, description, price, location, image_url, stock)
        VALUES ($1, $2, $3, $4, $5, $6, 0)`,
       [name, sku, description, price, location, image_url]
@@ -121,6 +120,76 @@ export async function updateStock(prevState: any, formData: FormData) {
     await client.query('ROLLBACK');
     console.error('Transaction Error:', error);
     return { success: false, message: 'Terjadi kesalahan pada server database.' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function searchProducts(query: string) {
+  if (!query || query.length < 2) return [];
+
+  const client = await pool.connect();
+  try {
+    const res = await client.query(
+      `SELECT id, sku, name, stock, price, location, image_url 
+       FROM products 
+       WHERE name ILIKE $1 OR sku ILIKE $1 
+       LIMIT 10`,
+      [`%${query}%`]
+    );
+    
+    return res.rows.map(row => ({
+      ...row,
+      price: row.price.toString(), 
+      stock: Number(row.stock)
+    }));
+  } catch (error) {
+    console.error('Search Error:', error);
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+export async function processBulkTransaction(items: { id: number; quantity: number }[], type: 'IN' | 'OUT') {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    for (const item of items) {
+      const res = await client.query('SELECT stock FROM products WHERE id = $1 FOR UPDATE', [item.id]);
+      
+      if (res.rows.length === 0) {
+         throw new Error(`Produk dengan ID ${item.id} tidak ditemukan.`);
+      }
+
+      const currentStock = Number(res.rows[0].stock);
+
+      if (type === 'OUT' && currentStock < item.quantity) {
+        throw new Error(`Stok tidak cukup untuk produk ID ${item.id}. Sisa: ${currentStock}`);
+      }
+
+      const newStock = type === 'IN' ? currentStock + item.quantity : currentStock - item.quantity;
+
+      await client.query(
+        `INSERT INTO stock_movements (product_id, type, quantity, notes, ending_stock)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [item.id, type, item.quantity, type === 'OUT' ? 'Bulk Outbound Order' : 'Bulk Inbound Receipt', newStock]
+      );
+
+      // Update Stok Produk
+      await client.query(`UPDATE products SET stock = $1 WHERE id = $2`, [newStock, item.id]);
+    }
+
+    await client.query('COMMIT');
+    revalidatePath('/');
+    return { success: true, message: `Berhasil memproses ${items.length} item!` };
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Bulk Transaction Error:', error);
+    return { success: false, message: error.message || 'Gagal memproses transaksi massal.' };
   } finally {
     client.release();
   }

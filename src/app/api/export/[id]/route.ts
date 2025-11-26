@@ -1,10 +1,16 @@
 import pool from '@/src/lib/db';
 import { NextResponse } from 'next/server';
+import { auth } from '@/src/auth'; 
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 });
+  }
+
   const { id } = await params;
 
   try {

@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Package, X, MapPin, Loader2, ArrowUpRight, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { searchProducts, processBulkTransaction } from '../actions'; 
 
 interface Product {
   id: number;
@@ -18,25 +19,6 @@ interface OrderItem extends Product {
   quantityToProcess: number;
 }
 
-const mockSearchProducts = async (query: string): Promise<Product[]> => {
-  await new Promise(resolve => setTimeout(resolve, 300)); 
-  const allProducts: Product[] = [
-    { id: 1, sku: 'KOP-ARA-100', name: 'Kopi Arabika', stock: 250, price: '85000', location: 'A-01-01', image_url: '' },
-    { id: 2, sku: 'KOP-AMR-100', name: 'Kopi Americano', stock: 25, price: '17000', location: 'B-02-03', image_url: '' },
-    { id: 3, sku: 'KOP-LAT-100', name: 'Kopi Susu Gula Aren', stock: 0, price: '21000', location: 'A-01-02', image_url: '' },
-    { id: 4, sku: 'TEH-HBT-050', name: 'Teh Hibiscus', stock: 50, price: '15000', location: 'C-03-01', image_url: '' },
-  ];
-
-  if (!query) return [];
-
-  const lowerCaseQuery = query.toLowerCase();
-
-  return allProducts.filter(p =>
-    p.sku.toLowerCase().includes(lowerCaseQuery) ||
-    p.name.toLowerCase().includes(lowerCaseQuery)
-  );
-};
-
 export default function BulkTransactionTable({ type = 'OUT' }: { type: 'IN' | 'OUT' }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -45,14 +27,21 @@ export default function BulkTransactionTable({ type = 'OUT' }: { type: 'IN' | 'O
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSearch = useCallback(async (query: string) => {
-    if (query.length < 3) {
+    if (query.length < 2) {
       setSearchResults([]);
       return;
     }
     setIsSearching(true);
-    const results = await mockSearchProducts(query); 
-    setSearchResults(results);
-    setIsSearching(false);
+    
+    try {
+      const results = await searchProducts(query);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Error searching products:", error);
+      toast.error("Gagal mencari produk.");
+    } finally {
+      setIsSearching(false);
+    }
   }, []);
 
   const handleAddItem = (product: Product) => {
@@ -95,15 +84,27 @@ export default function BulkTransactionTable({ type = 'OUT' }: { type: 'IN' | 'O
     
     setIsProcessing(true);
     
-    await new Promise(resolve => setTimeout(resolve, 2000)); 
-    
-    toast.success(`Success! ${orderItems.length} items processed.`);
-    
-    setOrderItems([]);
-    setIsProcessing(false);
+    try {
+      const payload = orderItems.map(item => ({
+        id: item.id,
+        quantity: item.quantityToProcess
+      }));
+
+      const result = await processBulkTransaction(payload, type);
+
+      if (result.success) {
+        toast.success(result.message);
+        setOrderItems([]); 
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan koneksi.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  // Total Quantity yang akan diproses
   const totalQuantity = useMemo(() => 
     orderItems.reduce((sum, item) => sum + item.quantityToProcess, 0), 
     [orderItems]
@@ -128,41 +129,43 @@ export default function BulkTransactionTable({ type = 'OUT' }: { type: 'IN' | 'O
           className="w-full p-3 pl-10 border border-slate-300 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none transition"
         />
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        {isSearching && (
+           <div className="absolute right-3 top-1/2 -translate-y-1/2">
+             <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+           </div>
+        )}
       </div>
 
-      {/* Search Results Dropdown */}
       <div className="relative">
-        {searchTerm.length >= 3 && searchResults.length > 0 && (
-          <div className="absolute z-10 w-full max-w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-            {isSearching ? (
-              <div className="p-4 text-center text-slate-500 flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Searching...
-              </div>
-            ) : (
-              searchResults.map(product => (
-                <div 
-                  key={product.id} 
-                  onClick={() => handleAddItem(product)}
-                  className="flex justify-between items-center p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
-                >
-                  <div className="flex flex-col">
-                      <span className="font-semibold text-sm text-slate-800">{product.name}</span>
-                      <div className="flex gap-2 text-xs text-slate-500">
-                          <span className="font-mono">SKU: {product.sku}</span>
-                          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {product.location || 'N/A'}</span>
-                      </div>
-                  </div>
-                  <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                      Stock: {product.stock}
-                  </span>
+        {searchTerm.length >= 2 && searchResults.length > 0 && (
+          <div className="absolute z-50 w-full max-w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+            {searchResults.map(product => (
+              <div 
+                key={product.id} 
+                onClick={() => handleAddItem(product)}
+                className="flex justify-between items-center p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+              >
+                <div className="flex flex-col">
+                    <span className="font-semibold text-sm text-slate-800">{product.name}</span>
+                    <div className="flex gap-2 text-xs text-slate-500">
+                        <span className="font-mono">SKU: {product.sku}</span>
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {product.location || 'N/A'}</span>
+                    </div>
                 </div>
-              ))
-            )}
+                <span className={`text-xs font-bold px-2 py-1 rounded ${product.stock < 10 ? 'bg-rose-100 text-rose-700' : 'bg-blue-50 text-blue-600'}`}>
+                    Stock: {product.stock}
+                </span>
+              </div>
+            ))}
           </div>
+        )}
+        {searchTerm.length >= 2 && !isSearching && searchResults.length === 0 && (
+           <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-center text-slate-500 text-sm">
+             Product not found.
+           </div>
         )}
       </div>
       
-      {/* Order List Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
         <div className={`p-4 font-bold text-lg ${headerStyle} flex justify-between items-center`}>
             <span>{type === 'OUT' ? 'Outbound Order List' : 'Inbound Receipt List'}</span>
@@ -171,7 +174,7 @@ export default function BulkTransactionTable({ type = 'OUT' }: { type: 'IN' | 'O
         
         <div className="overflow-x-auto max-h-[500px]">
             <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider sticky top-0">
+                <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider sticky top-0 z-10">
                     <tr>
                         <th className="px-6 py-3 text-left whitespace-nowrap">Product (SKU)</th>
                         <th className="px-6 py-3 text-left whitespace-nowrap">Location</th>
@@ -231,7 +234,6 @@ export default function BulkTransactionTable({ type = 'OUT' }: { type: 'IN' | 'O
         </div>
       </div>
       
-      {/* Footer Summary & Process Button */}
       <div className="flex justify-end pt-4 border-t border-slate-100">
         <div className="w-full max-w-sm space-y-3">
           <div className="flex justify-between items-center px-4 py-2 bg-slate-100 rounded-lg">
@@ -246,7 +248,7 @@ export default function BulkTransactionTable({ type = 'OUT' }: { type: 'IN' | 'O
           >
             {isProcessing ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Processing Bulk Transaction...
+                <Loader2 className="w-4 h-4 animate-spin" /> Processing...
               </>
             ) : (
               <>
