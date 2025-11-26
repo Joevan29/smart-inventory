@@ -178,18 +178,35 @@ export async function processBulkTransaction(items: { id: number; quantity: numb
         [item.id, type, item.quantity, type === 'OUT' ? 'Bulk Outbound Order' : 'Bulk Inbound Receipt', newStock]
       );
 
-      // Update Stok Produk
       await client.query(`UPDATE products SET stock = $1 WHERE id = $2`, [newStock, item.id]);
     }
 
     await client.query('COMMIT');
-    revalidatePath('/');
+    revalidatePath('/'); 
     return { success: true, message: `Berhasil memproses ${items.length} item!` };
 
   } catch (error: any) {
     await client.query('ROLLBACK');
     console.error('Bulk Transaction Error:', error);
     return { success: false, message: error.message || 'Gagal memproses transaksi massal.' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function getProductBySku(sku: string) {
+  const client = await pool.connect();
+  try {
+    const res = await client.query('SELECT * FROM products WHERE sku = $1', [sku]);
+    const product = res.rows[0];
+    if (product) {
+        product.stock = Number(product.stock);
+        product.price = product.price.toString();
+    }
+    return product || null;
+  } catch (error) {
+    console.error('Scan Error:', error);
+    return null;
   } finally {
     client.release();
   }

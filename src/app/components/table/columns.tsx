@@ -2,7 +2,7 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import Link from 'next/link';
-import { ArrowUpDown, Eye, Pencil, MapPin } from 'lucide-react';
+import { Eye, Pencil, MapPin } from 'lucide-react';
 import DeleteButton from '../DeleteButton';
 import StockActionCell from './StockActionCell';
 
@@ -14,6 +14,30 @@ export type Product = {
   price: string;
   image_url: string;
   location?: string;
+};
+
+const getAvatarColor = (name: string) => {
+  const colors = [
+    'bg-red-100 text-red-700 border-red-200',
+    'bg-orange-100 text-orange-700 border-orange-200',
+    'bg-amber-100 text-amber-700 border-amber-200',
+    'bg-emerald-100 text-emerald-700 border-emerald-200',
+    'bg-teal-100 text-teal-700 border-teal-200',
+    'bg-cyan-100 text-cyan-700 border-cyan-200',
+    'bg-blue-100 text-blue-700 border-blue-200',
+    'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'bg-violet-100 text-violet-700 border-violet-200',
+    'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
+    'bg-pink-100 text-pink-700 border-pink-200',
+    'bg-rose-100 text-rose-700 border-rose-200',
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  return colors[Math.abs(hash) % colors.length];
 };
 
 export const columns: ColumnDef<Product>[] = [
@@ -33,35 +57,32 @@ export const columns: ColumnDef<Product>[] = [
         .join('')
         .toUpperCase();
 
+      const colorClass = getAvatarColor(name);
+
       return (
-        <div className="flex items-start gap-3 py-2">
-          {/* Gambar */}
-          <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-100 relative flex-shrink-0 bg-slate-50 mt-1">
+        <div className="flex items-start gap-3 py-1">
+          <div className={`w-10 h-10 rounded-xl overflow-hidden border relative flex-shrink-0 mt-0.5 flex items-center justify-center text-xs font-bold shadow-sm ${!imageUrl || imageUrl.includes('placehold.co') ? colorClass : 'border-slate-200'}`}>
              {!imageUrl || imageUrl.includes('placehold.co') ? (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-xs">
-                  {initials}
-                </div>
+                <span>{initials}</span>
              ) : (
                <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
              )}
           </div>
           
-          {/* Info Detail */}
-          <div className="flex flex-col gap-1">
-            <span className="font-bold text-slate-800 text-sm leading-tight">{name}</span>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] bg-slate-100 text-slate-500 border border-slate-200 px-1.5 rounded tracking-wide">
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-800 text-sm leading-tight hover:text-slate-600 transition-colors cursor-default">
+              {name}
+            </span>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="font-mono text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                 {sku}
               </span>
               
-              {/* Badge Lokasi */}
-              {location ? (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 rounded">
-                  <MapPin className="w-2.5 h-2.5" />
+              {location && (
+                <span className="flex items-center gap-0.5 text-[10px] font-bold text-slate-500">
+                  <MapPin className="w-2.5 h-2.5 text-slate-400" />
                   {location}
                 </span>
-              ) : (
-                <span className="text-[10px] text-slate-300 italic">No Loc</span>
               )}
             </div>
           </div>
@@ -71,19 +92,35 @@ export const columns: ColumnDef<Product>[] = [
   },
   {
     accessorKey: 'stock',
-    header: 'Level',
+    header: 'Stock Level',
     cell: ({ row }) => {
       const stock = parseInt(row.getValue('stock'));
       
-      let badgeStyle = "bg-slate-100 text-slate-600 border-slate-200";
-      if (stock === 0) badgeStyle = "bg-rose-50 text-rose-600 border-rose-100";
-      else if (stock < 10) badgeStyle = "bg-amber-50 text-amber-600 border-amber-100";
-      else if (stock > 100) badgeStyle = "bg-emerald-50 text-emerald-600 border-emerald-100";
+      let badgeClass = "bg-slate-100 text-slate-600 border-slate-200";
+      let statusText = "Good";
+      
+      if (stock === 0) {
+        badgeClass = "bg-rose-50 text-rose-600 border-rose-200";
+        statusText = "Out of Stock";
+      }
+      else if (stock < 10) {
+        badgeClass = "bg-amber-50 text-amber-600 border-amber-200";
+        statusText = "Low Stock";
+      }
+      else if (stock > 100) {
+        badgeClass = "bg-emerald-50 text-emerald-600 border-emerald-200";
+        statusText = "In Stock";
+      }
       
       return (
-        <div className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${badgeStyle}`}>
-          {stock < 10 && stock > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>}
-          {stock}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-700">{stock}</span>
+            <span className="text-[10px] text-slate-400 font-medium">Units</span>
+          </div>
+          <span className={`inline-flex w-fit items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}`}>
+            {statusText}
+          </span>
         </div>
       );
     },
@@ -95,11 +132,11 @@ export const columns: ColumnDef<Product>[] = [
   },
   {
     accessorKey: 'price',
-    header: 'Price',
+    header: 'Base Price',
     cell: ({ row }) => {
       const price = parseFloat(row.getValue('price'));
       return (
-        <span className="font-mono text-xs text-slate-600 font-medium">
+        <span className="font-mono text-sm text-slate-600 font-bold tracking-tight">
           {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(price)}
         </span>
       );
@@ -111,24 +148,22 @@ export const columns: ColumnDef<Product>[] = [
     cell: ({ row }) => {
       const product = row.original;
       return (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Link 
             href={`/history/${product.id}`}
-            className="p-1.5 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
-            title="History"
+            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+            title="View History"
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="w-4 h-4" />
           </Link>
           <Link 
             href={`/edit/${product.id}`}
-            className="p-1.5 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-amber-600 hover:border-amber-200 transition-all shadow-sm"
-            title="Edit"
+            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+            title="Edit Product"
           >
-            <Pencil className="w-3.5 h-3.5" />
+            <Pencil className="w-4 h-4" />
           </Link>
-          <div className="scale-90">
-             <DeleteButton id={product.id} productName={product.name} />
-          </div>
+          <DeleteButton id={product.id} productName={product.name} />
         </div>
       );
     },

@@ -4,18 +4,16 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Command } from 'cmdk';
 import { 
-  Calculator, 
-  Calendar, 
-  CreditCard, 
   Settings, 
-  Smile, 
   User, 
   Search,
   Plus,
   Package,
-  History,
-  LogOut
+  LogOut,
+  ArrowUpRight,
+  ScanLine
 } from 'lucide-react';
+import { signOut } from '@/src/auth';
 
 export function CommandMenu() {
   const [open, setOpen] = React.useState(false);
@@ -38,9 +36,13 @@ export function CommandMenu() {
     command();
   }, []);
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
     <>
-      <div className="fixed bottom-4 right-4 z-50 hidden md:flex items-center gap-2 text-xs text-slate-400 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+      <div className="fixed bottom-4 right-4 z-50 hidden md:flex items-center gap-2 text-xs text-slate-400 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all cursor-pointer" onClick={() => setOpen(true)}>
         <span>Press</span>
         <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-slate-100 px-1.5 font-mono text-[10px] font-medium text-slate-500 opacity-100">
           <span className="text-xs">⌘</span>K
@@ -77,6 +79,22 @@ export function CommandMenu() {
             </Command.Item>
             
             <Command.Item 
+              onSelect={() => runCommand(() => router.push('/outbound'))}
+              className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 cursor-pointer aria-selected:bg-rose-50 aria-selected:text-rose-700 transition-colors"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              <span>Process Outbound Order (Bulk)</span>
+            </Command.Item>
+
+            <Command.Item 
+              onSelect={() => runCommand(() => router.push('/scan'))}
+              className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-emerald-600 hover:bg-emerald-50 cursor-pointer aria-selected:bg-emerald-50 aria-selected:text-emerald-700 transition-colors"
+            >
+              <ScanLine className="h-4 w-4" />
+              <span>Open QR Scanner</span>
+            </Command.Item>
+
+            <Command.Item 
               onSelect={() => runCommand(() => router.push('/'))}
               className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100 cursor-pointer aria-selected:bg-slate-100 aria-selected:text-slate-900 transition-colors"
             >
@@ -87,12 +105,15 @@ export function CommandMenu() {
 
           <Command.Group heading="System" className="text-xs font-medium text-slate-500 px-2 py-1.5 mt-2">
             <Command.Item 
+              onSelect={() => runCommand(() => router.push('/settings'))}
               className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100 cursor-pointer aria-selected:bg-slate-100 aria-selected:text-slate-900 transition-colors"
             >
-              <User className="h-4 w-4" />
-              <span>Profile (Coming Soon)</span>
+              <Settings className="h-4 w-4" />
+              <span>Settings & Profile</span>
             </Command.Item>
+            
             <Command.Item 
+              onSelect={() => runCommand(handleSignOut)}
               className="flex items-center gap-2 px-2 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 cursor-pointer aria-selected:bg-rose-50 aria-selected:text-rose-700 transition-colors"
             >
               <LogOut className="h-4 w-4" />
@@ -102,7 +123,7 @@ export function CommandMenu() {
         </Command.List>
       </Command.Dialog>
 
-      {open && <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[9998]" />}
+      {open && <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[9998]" onClick={() => setOpen(false)} />}
     </>
   );
 }

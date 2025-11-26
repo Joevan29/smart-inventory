@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 export default function Error({
   error,
@@ -14,40 +15,43 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 text-center">
-      <div className="bg-white p-8 rounded-2xl shadow-xl border border-rose-100 max-w-md w-full">
-        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-          </svg>
+    <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50/50 p-4 text-center font-sans">
+      <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl border border-rose-100 max-w-lg w-full relative overflow-hidden">
+        
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-rose-500"></div>
+
+        <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-rose-100">
+          <AlertTriangle className="w-10 h-10" />
         </div>
         
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Something went wrong!</h2>
-        <p className="text-slate-500 text-sm mb-6">
-          Terjadi kesalahan saat memuat data. Ini mungkin masalah koneksi atau server sedang sibuk.
+        <h2 className="text-2xl font-extrabold text-slate-900 mb-3">System Encountered an Error</h2>
+        <p className="text-slate-500 text-sm mb-8 leading-relaxed max-w-sm mx-auto">
+          Terjadi kesalahan yang tidak diharapkan. Tim teknis kami mungkin sudah menerima laporan ini. Silakan coba muat ulang.
         </p>
 
-        <div className="flex gap-3 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
             onClick={() => window.location.href = '/'}
-            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-50 transition"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-50 hover:text-slate-900 transition-colors"
           >
+            <Home className="w-4 h-4" />
             Back Home
           </button>
           <button
-            onClick={
-              () => reset()
-            }
-            className="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg text-sm hover:bg-rose-700 transition shadow-md"
+            onClick={() => reset()}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-rose-600 text-white font-bold rounded-xl text-sm hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 active:scale-[0.98]"
           >
+            <RefreshCw className="w-4 h-4" />
             Try Again
           </button>
         </div>
         
         {error.digest && (
-          <p className="mt-6 text-[10px] text-slate-400 font-mono">
-            Error Digest: {error.digest}
-          </p>
+          <div className="mt-8 pt-6 border-t border-slate-50">
+            <p className="text-[10px] text-slate-400 font-mono bg-slate-50 py-1 px-2 rounded inline-block">
+              Error Code: {error.digest}
+            </p>
+          </div>
         )}
       </div>
     </main>

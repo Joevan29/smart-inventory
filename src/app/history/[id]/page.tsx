@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import DeleteButton from '../../components/DeleteButton';
 import TransactionForm from '../../components/TransactionForm';
+import ProductLabelButton from '../../components/ProductLabelButton'; 
 import { 
   MapPin, 
   Package, 
@@ -11,7 +12,8 @@ import {
   ArrowLeft, 
   CalendarClock, 
   History,
-  TrendingUp
+  TrendingUp,
+  Download
 } from 'lucide-react';
 
 interface HistoryLog {
@@ -82,18 +84,19 @@ export default async function HistoryPage({ params }: Props) {
           
           <div className="xl:col-span-2 space-y-6">
             
+            {/* Header Card */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
-              <div className="relative z-10 flex justify-between items-start">
+              <div className="relative z-10 flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-md tracking-wider">
+                    <span className="bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-md tracking-wider font-mono">
                       {product.sku}
                     </span>
                     <span className="text-xs font-medium text-slate-400">
                       System ID: #{product.id}
                     </span>
                   </div>
-                  <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
+                  <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
                     {product.name}
                   </h1>
                   <p className="text-slate-500 text-sm max-w-2xl leading-relaxed">
@@ -101,10 +104,12 @@ export default async function HistoryPage({ params }: Props) {
                   </p>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <ProductLabelButton product={product} />
+                  
                   <Link 
                     href={`/edit/${id}`}
-                    className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 hover:text-slate-900 transition-all"
+                    className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 hover:text-slate-900 transition-all border border-slate-200"
                     title="Edit Product"
                   >
                     <Pencil className="w-4 h-4" />
@@ -117,7 +122,7 @@ export default async function HistoryPage({ params }: Props) {
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-slate-100">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
                     <DollarSign className="w-5 h-5" />
                   </div>
                   <div>
@@ -125,8 +130,9 @@ export default async function HistoryPage({ params }: Props) {
                     <p className="text-lg font-bold text-slate-900">{formatCurrency(product.price)}</p>
                   </div>
                 </div>
+                
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
                     <MapPin className="w-5 h-5" />
                   </div>
                   <div>
@@ -134,8 +140,9 @@ export default async function HistoryPage({ params }: Props) {
                     <p className="text-lg font-bold text-slate-900">{product.location || '-'}</p>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-violet-50 text-violet-600 rounded-xl">
+                  <div className="p-2.5 bg-violet-50 text-violet-600 rounded-xl border border-violet-100">
                     <TrendingUp className="w-5 h-5" />
                   </div>
                   <div>
@@ -155,11 +162,13 @@ export default async function HistoryPage({ params }: Props) {
                 <a 
                   href={`/api/export/${id}`} 
                   target="_blank"
-                  className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
+                  className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm flex items-center gap-2"
                 >
-                  Download CSV
+                  <Download className="w-3.5 h-3.5" />
+                  CSV Report
                 </a>
               </div>
+              
               <div className="overflow-x-auto max-h-[500px]">
                 <table className="w-full text-sm text-left border-collapse">
                   <thead className="text-[11px] text-slate-500 uppercase bg-slate-50/80 font-bold border-b border-slate-200 sticky top-0 backdrop-blur-sm">
