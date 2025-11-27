@@ -1,6 +1,7 @@
 import pool from '@/src/lib/db';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Activity, ArrowDownLeft, ArrowUpRight, Search } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Activity, ArrowDownLeft, ArrowUpRight, Search as SearchIcon } from 'lucide-react';
+import Search from '../components/Search'; 
 
 interface ActivityLog {
   id: number;
@@ -13,21 +14,36 @@ interface ActivityLog {
   ending_stock: number;
 }
 
-async function getActivities() {
-  const res = await pool.query(`
+async function getActivities(query: string) {
+  let queryText = `
     SELECT 
       sm.id, sm.type, sm.quantity, sm.notes, sm.created_at, sm.ending_stock,
       p.name as product_name, p.sku
     FROM stock_movements sm
     JOIN products p ON sm.product_id = p.id
-    ORDER BY sm.created_at DESC
-    LIMIT 100
-  `);
+  `;
+  let queryValues: string[] = [];
+
+  if (query) {
+    queryValues.push(`%${query}%`);
+    queryText += ` WHERE p.name ILIKE $1 OR p.sku ILIKE $1`;
+  }
+  
+  queryText += ` ORDER BY sm.created_at DESC LIMIT 100`;
+
+  const res = await pool.query(queryText, queryValues);
   return res.rows as ActivityLog[];
 }
 
-export default async function ActivityPage() {
-  const activities = await getActivities();
+interface Props {
+  searchParams: {
+    query?: string;
+  };
+}
+
+export default async function ActivityPage({ searchParams }: Props) {
+  const query = searchParams?.query || '';
+  const activities = await getActivities(query);
 
   const groupedActivities = activities.reduce((groups, activity) => {
     const date = new Date(activity.created_at).toLocaleDateString('id-ID', { 
@@ -68,17 +84,23 @@ export default async function ActivityPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 md:px-8 py-8">
+        
+        <div className="mb-8">
+            <Search placeholder="Search activity by Product Name or SKU..." />
+        </div>
+        
         <div className="relative">
-          {/* Vertical Line */}
           <div className="absolute left-4 top-0 bottom-0 w-px bg-slate-200 md:left-8"></div>
 
           {Object.keys(groupedActivities).length === 0 ? (
             <div className="text-center py-20">
               <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8 text-slate-400" />
+                <SearchIcon className="w-8 h-8 text-slate-400" />
               </div>
               <h3 className="text-slate-900 font-bold">No activity found</h3>
-              <p className="text-slate-500 text-sm">Belum ada transaksi yang tercatat di sistem.</p>
+              <p className="text-slate-500 text-sm">
+                {query ? `Tidak ada transaksi yang cocok dengan "${query}".` : 'Belum ada transaksi yang tercatat di sistem.'}
+              </p>
             </div>
           ) : (
             Object.entries(groupedActivities).map(([date, items]) => (

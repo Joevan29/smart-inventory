@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/genai": "^1.30.0",
     "@huggingface/inference": "^4.13.4",
     "@tanstack/react-table": "^8.21.3",
     "@yudiel/react-qr-scanner": "^2.4.1",

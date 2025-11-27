@@ -1,3 +1,4 @@
+// src/app/page.tsx
 import pool from '../lib/db';
 import { auth, signOut } from '../auth';
 import Search from './components/Search';
@@ -5,7 +6,9 @@ import Pagination from './components/Pagination';
 import StockChart from './components/StockChart';
 import { DataTable } from './components/table/data-table';
 import { columns } from './components/table/columns';
-import FadeIn from './components/FadeIn'; 
+import FadeIn from './components/FadeIn';
+import LocationFilter from './components/LocationFilter';
+import { getRestockPrediction } from './actions'; 
 import {
   Plus,
   DollarSign,
@@ -15,13 +18,15 @@ import {
   TrendingUp,
   Box,
   LayoutDashboard,
-  Search as SearchIcon,
   ArrowDownLeft,
   Activity,
   ScanLine,
-  Lightbulb 
+  Lightbulb,
+  Zap,
+  RefreshCw 
 } from 'lucide-react';
 import Link from 'next/link';
+
 
 interface Product {
   id: number;
@@ -47,6 +52,27 @@ interface RecentActivity {
   product_name: string;
   created_at: Date;
 }
+
+interface PredictionResult {
+  product_id: number;
+  product_name: string;
+  sku: string;
+  current_stock: number;
+  location: string;
+  prediction_qty: number;
+  days_to_empty: number;
+}
+
+async function getUniqueLocations(): Promise<string[]> {
+  const res = await pool.query(`
+    SELECT DISTINCT SUBSTRING(location FROM 1 FOR 1) as zone
+    FROM products
+    WHERE location IS NOT NULL AND location != ''
+    ORDER BY zone ASC
+  `);
+  return res.rows.map(row => row.zone).filter(zone => /^[A-Z0-9]$/i.test(zone));
+}
+
 
 async function getStats(): Promise<DashboardStats> {
   const res = await pool.query(`
@@ -85,41 +111,60 @@ async function getRecentActivities(): Promise<RecentActivity[]> {
   return res.rows;
 }
 
-async function getProducts(query: string, currentPage: number): Promise<Product[]> {
+async function getProducts(query: string, currentPage: number, location: string): Promise<Product[]> {
   const ITEMS_PER_PAGE = 7;
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
-
-  let text = `SELECT * FROM products ORDER BY id DESC LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}`;
-  let values: string[] = [];
+  
+  let text = `SELECT * FROM products`;
+  let conditions: string[] = [];
+  let values: (string | number)[] = [];
 
   if (query) {
-    text = `
-      SELECT * FROM products 
-      WHERE name ILIKE $1 OR sku ILIKE $1 
-      ORDER BY id DESC
-      LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
-    `;
-    values = [`%${query}%`];
+    values.push(`%${query}%`);
+    conditions.push(`(name ILIKE $${values.length} OR sku ILIKE $${values.length})`);
   }
+  
+  if (location) {
+    values.push(`${location}%`);
+    conditions.push(`location ILIKE $${values.length}`);
+  }
+  
+  if (conditions.length > 0) {
+    text += ` WHERE ` + conditions.join(' AND ');
+  }
+
+  text += ` ORDER BY id DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+  values.push(ITEMS_PER_PAGE, offset);
 
   const res = await pool.query(text, values);
   return res.rows;
 }
 
-async function getTotalPages(query: string): Promise<number> {
+async function getTotalPages(query: string, location: string): Promise<number> {
   const ITEMS_PER_PAGE = 7;
   let text = 'SELECT COUNT(*) FROM products';
+  let conditions: string[] = [];
   let values: string[] = [];
 
   if (query) {
-    text += ' WHERE name ILIKE $1 OR sku ILIKE $1';
-    values = [`%${query}%`];
+    values.push(`%${query}%`);
+    conditions.push(`(name ILIKE $${values.length} OR sku ILIKE $${values.length})`);
+  }
+
+  if (location) {
+    values.push(`${location}%`);
+    conditions.push(`location ILIKE $${values.length}`);
+  }
+
+  if (conditions.length > 0) {
+    text += ' WHERE ' + conditions.join(' AND ');
   }
 
   const res = await pool.query(text, values);
   const totalItems = Number(res.rows[0].count);
   return Math.ceil(totalItems / ITEMS_PER_PAGE);
 }
+
 
 const formatCurrency = (value: string | number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -148,6 +193,7 @@ type Props = {
   searchParams: Promise<{
     query?: string;
     page?: string;
+    location?: string;
   }>;
 };
 
@@ -156,13 +202,16 @@ export default async function Home(props: Props) {
   const searchParams = await props.searchParams;
   const query = searchParams?.query || '';
   const currentPage = Number(searchParams?.page) || 1;
+  const locationFilter = searchParams?.location || '';
 
-  const [products, totalPages, stats, chartData, recentActivities] = await Promise.all([
-    getProducts(query, currentPage),
-    getTotalPages(query),
+  const [products, totalPages, stats, chartData, recentActivities, uniqueLocations, restockRecommendations] = await Promise.all([
+    getProducts(query, currentPage, locationFilter),
+    getTotalPages(query, locationFilter),
     getStats(),
     getChartData(),
-    getRecentActivities()
+    getRecentActivities(),
+    getUniqueLocations(), 
+    getRestockPrediction() 
   ]);
 
   return (
@@ -210,6 +259,7 @@ export default async function Home(props: Props) {
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 space-y-8">
 
+        {/* STATS SECTION */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FadeIn delay={0} className="col-span-1 md:col-span-2 h-full">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm card-hover group relative overflow-hidden h-full">
@@ -273,6 +323,8 @@ export default async function Home(props: Props) {
             <div className="flex-1 w-full flex gap-2">
               <Search placeholder="Search products by Name, SKU..." />
               
+              {uniqueLocations.length > 0 && <LocationFilter locations={uniqueLocations} />}
+              
               <Link 
                 href="/scan"
                 className="flex items-center justify-center bg-slate-100 text-slate-600 w-12 rounded-xl hover:bg-slate-200 transition-colors border border-slate-200 shrink-0"
@@ -301,7 +353,7 @@ export default async function Home(props: Props) {
             </div>
           </section>
         </FadeIn>
-
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
           <section className="lg:col-span-2 space-y-4 min-w-0">
@@ -346,6 +398,92 @@ export default async function Home(props: Props) {
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-yellow-600" />
+                    AI Restock Prediction
+                  </h3>
+                  <button className="text-xs font-bold text-slate-400 hover:text-slate-700 hover:underline flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" /> 
+                    Recalculate
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {restockRecommendations.length === 0 ? (
+                    <div className="text-xs text-slate-400 text-center py-4 italic bg-slate-50 rounded-lg">
+                      Tidak ada aktivitas OUT dalam 30 hari terakhir untuk prediksi.
+                    </div>
+                  ) : (
+                    restockRecommendations.map((item) => (
+                      <Link 
+                        key={item.product_id} 
+                        href={`/history/${item.product_id}`}
+                        className="p-3 bg-yellow-50/50 rounded-xl border border-yellow-200 block hover:bg-yellow-100 transition-colors"
+                      >
+                          <p className="text-sm font-bold text-slate-900 leading-tight truncate">
+                              {item.product_name}
+                          </p>
+                          <p className="text-[10px] font-mono text-slate-500 mb-2">{item.sku}</p>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                  <span className="block font-bold text-slate-700">Stock: {item.current_stock}</span>
+                                  <span className="text-slate-500">Loc: {item.location}</span>
+                              </div>
+                              <div className="text-right">
+                                  {item.days_to_empty <= 15 ? ( // Menggunakan 15 hari sebagai threshold kritis
+                                      <p className="font-bold text-rose-600">Habis dalam {item.days_to_empty} hari!</p>
+                                  ) : (
+                                      <p className="font-bold text-emerald-600">Stabil ({'>'}15 hari)</p>
+                                  )}
+                                  <span className="block text-[10px] text-slate-500 mt-0.5">
+                                      Restock Qty: <strong className="text-slate-900">{item.prediction_qty}</strong>
+                                  </span>
+                              </div>
+                          </div>
+                      </Link>
+                    ))
+                  )}
+                </div>
+                
+                <Link
+                    href="/outbound"
+                    className="block w-full text-center mt-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
+                >
+                    Create Bulk Restock Order
+                </Link>
+              </div>
+            </FadeIn>
+            
+            <FadeIn delay={700}>
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="relative z-10">
+                  <h4 className="font-bold text-base mb-3 flex items-center gap-2 text-yellow-300">
+                    <Lightbulb className="w-4 h-4" /> 
+                    Inventory Insight
+                  </h4>
+                  {stats.out_of_stock > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-slate-300 text-sm leading-relaxed">
+                        Perhatian! Ada <strong className="text-white">{stats.out_of_stock} produk</strong> yang stoknya habis (0).
+                      </p>
+                      <Link href="/outbound" className="inline-block text-xs font-bold text-white bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition">
+                        Check Stock & Restock
+                      </Link>
+                    </div>
+                  ) : (
+                    <p className="text-slate-300 text-sm leading-relaxed">
+                      Kesehatan inventori Anda baik. Gunakan fitur <strong>Scanner</strong> untuk melakukan <em>stock opname</em> rutin dan menjaga akurasi data.
+                    </p>
+                  )}
+                </div>
+                <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
+              </div>
+            </FadeIn>
+
+             <FadeIn delay={800}> 
+               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
                     <Activity className="w-4 h-4 text-indigo-500" />
                     Recent Activity
                   </h3>
@@ -356,7 +494,6 @@ export default async function Home(props: Props) {
                     View All
                   </Link>
                 </div>
-
                 <div className="space-y-0 relative">
                   <div className="absolute left-2.5 top-2 bottom-2 w-px bg-slate-100"></div>
 
@@ -390,34 +527,7 @@ export default async function Home(props: Props) {
                   Open Full Audit Log
                 </Link>
               </div>
-            </FadeIn>
-
-            <FadeIn delay={700}>
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-                <div className="relative z-10">
-                  <h4 className="font-bold text-base mb-3 flex items-center gap-2 text-yellow-300">
-                    <Lightbulb className="w-4 h-4" /> 
-                    Inventory Insight
-                  </h4>
-                  
-                  {stats.out_of_stock > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-slate-300 text-sm leading-relaxed">
-                        Perhatian! Ada <strong className="text-white">{stats.out_of_stock} produk</strong> yang stoknya habis (0).
-                      </p>
-                      <Link href="/outbound" className="inline-block text-xs font-bold text-white bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition">
-                        Check Stock & Restock
-                      </Link>
-                    </div>
-                  ) : (
-                    <p className="text-slate-300 text-sm leading-relaxed">
-                      Kesehatan inventori Anda baik. Gunakan fitur <strong>Scanner</strong> untuk melakukan <em>stock opname</em> rutin dan menjaga akurasi data.
-                    </p>
-                  )}
-                </div>
-                <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
-              </div>
-            </FadeIn>
+             </FadeIn>
           </section>
         </div>
 

@@ -1,3 +1,4 @@
+// src/app/api/export/[id]/route.ts
 import pool from '@/src/lib/db';
 import { NextResponse } from 'next/server';
 import { auth } from '@/src/auth'; 
@@ -22,12 +23,12 @@ export async function GET(
     }
 
     const historyRes = await pool.query(
-      'SELECT type, quantity, notes, created_at FROM stock_movements WHERE product_id = $1 ORDER BY created_at DESC',
+      'SELECT type, quantity, notes, created_at, ending_stock FROM stock_movements WHERE product_id = $1 ORDER BY created_at DESC',
       [id]
     );
     const history = historyRes.rows;
 
-    const csvHeader = ['Date', 'Time', 'Type', 'Quantity', 'Notes'].join(',');
+    const csvHeader = ['Date', 'Time', 'Type', 'Quantity', 'Notes', 'Ending Stock'].join(',');
 
     const csvRows = history.map(log => {
       const date = new Date(log.created_at);
@@ -36,7 +37,7 @@ export async function GET(
       
       const cleanNotes = log.notes ? `"${log.notes.replace(/"/g, '""')}"` : '';
 
-      return [dateStr, timeStr, log.type, log.quantity, cleanNotes].join(',');
+      return [dateStr, timeStr, log.type, log.quantity, cleanNotes, log.ending_stock].join(',');
     });
 
     const csvString = [csvHeader, ...csvRows].join('\n');

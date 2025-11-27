@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Package, MapPin, Info, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 interface Product {
   id: number;
@@ -34,7 +35,6 @@ export default function WarehouseMap({ products }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* --- Map Grid --- */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {zoneKeys.map((zone) => {
           const itemCount = zones[zone].length;
@@ -77,7 +77,6 @@ export default function WarehouseMap({ products }: Props) {
                 <p className="text-xs text-slate-500 mt-1 font-medium">Total Items: {totalStock}</p>
               </div>
 
-              {/* Decorative Pattern */}
               <div className="absolute bottom-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
                 <MapPin className="w-12 h-12" />
               </div>
@@ -100,21 +99,25 @@ export default function WarehouseMap({ products }: Props) {
           
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
             {zones[selectedZone].map((product) => (
-              <div key={product.id} className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-colors group">
+              <Link 
+                key={product.id} 
+                href={`/history/${product.id}`}
+                className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-colors group"
+              >
                 <div className={`w-2 h-full rounded-full flex-shrink-0 ${product.stock < 10 ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-slate-900 truncate">{product.name}</p>
                   <p className="text-[10px] text-slate-500 font-mono mb-2">{product.sku}</p>
                   <div className="flex justify-between items-end">
                     <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                      {product.location || 'No Loc'}
+                      {product.location || 'N/A'}
                     </span>
                     <span className={`text-sm font-bold ${product.stock < 10 ? 'text-rose-600' : 'text-slate-700'}`}>
                       {product.stock} <span className="text-[10px] font-normal text-slate-400">qty</span>
                     </span>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

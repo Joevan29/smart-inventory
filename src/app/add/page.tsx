@@ -1,12 +1,43 @@
 'use client';
 
-import { createProduct } from '../actions';
+import { createProduct, generateDescription } from '../actions';
 import Link from 'next/link';
-import { Box, MapPin, Layers, Tag, AlignLeft, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { useActionState } from 'react';
+import { Box, MapPin, Layers, Tag, AlignLeft, ArrowLeft, CheckCircle2, AlertCircle, Loader2, Zap } from 'lucide-react';
+import { useActionState, useState } from 'react'; 
+import { toast } from 'sonner';
 
 export default function AddProductPage() {
   const [state, formAction, isPending] = useActionState(createProduct, null);
+  const [description, setDescription] = useState(''); 
+  const [isGenerating, setIsGenerating] = useState(false); 
+
+  const handleGenerateDescription = async (formData: FormData) => {
+    const sku = formData.get('sku') as string;
+    const name = formData.get('name') as string;
+
+    if (!sku || !name) {
+        toast.error("SKU dan Nama produk harus diisi terlebih dahulu!");
+        return;
+    }
+    
+    setIsGenerating(true);
+    toast.info("AI sedang merangkai deskripsi...");
+
+    try {
+        const result = await generateDescription(sku, name);
+
+        if (result.success && result.description) {
+            setDescription(result.description);
+            toast.success("Deskripsi AI berhasil dibuat!");
+        } else {
+            toast.error(result.message || "Gagal menghasilkan deskripsi AI.");
+        }
+    } catch (e) {
+        toast.error("Terjadi kesalahan saat memanggil layanan AI.");
+    } finally {
+        setIsGenerating(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-50/50 p-4 md:p-8 flex justify-center items-start md:items-center font-sans">
@@ -42,6 +73,7 @@ export default function AddProductPage() {
             </div>
           )}
 
+          {/* Form utama menggunakan createProduct Server Action */}
           <form action={formAction} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6">
@@ -56,9 +88,9 @@ export default function AddProductPage() {
                         name="sku" 
                         type="text" 
                         placeholder="e.g. K-001-ARA" 
+                        required 
                         className={`w-full border p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 outline-none font-mono text-sm font-medium transition-all ${state?.errors?.sku ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
                       />
-                      {/* Pesan Error Spesifik Field SKU */}
                       {state?.errors?.sku && (
                         <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.sku[0]}</p>
                       )}
@@ -69,6 +101,7 @@ export default function AddProductPage() {
                         name="name" 
                         type="text" 
                         placeholder="e.g. Premium Arabica Coffee" 
+                        required 
                         className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-medium transition-all hover:border-slate-300" 
                       />
                       {state?.errors?.name && (
@@ -83,6 +116,8 @@ export default function AddProductPage() {
                           name="price" 
                           type="number" 
                           placeholder="0"
+                          required 
+                          min="100" 
                           className="w-full border border-slate-200 bg-slate-50 p-3 pl-10 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-bold transition-all hover:border-slate-300" 
                         />
                       </div>
@@ -111,6 +146,7 @@ export default function AddProductPage() {
                           name="location" 
                           type="text" 
                           placeholder="Zone-Rack-Level (e.g. A-01-05)" 
+                          required 
                           className="w-full border border-emerald-100 bg-emerald-50/30 p-3 pl-10 rounded-xl text-emerald-900 placeholder:text-emerald-900/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none font-bold text-sm tracking-wide transition-all" 
                         />
                       </div>
@@ -118,6 +154,7 @@ export default function AddProductPage() {
                         <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.location[0]}</p>
                       )}
                     </div>
+                    
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1 flex items-center gap-2">
                         <AlignLeft className="w-3 h-3" /> Description
@@ -126,8 +163,32 @@ export default function AddProductPage() {
                         name="description" 
                         rows={4} 
                         placeholder="Write a brief description about the product specifications..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                         className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all text-sm font-medium resize-none hover:border-slate-300"
                       ></textarea>
+                    </div>
+
+                    <div className="pt-2">
+                        <form action={handleGenerateDescription}>
+                            <input type="hidden" name="sku" defaultValue={(document.getElementsByName('sku')[0] as HTMLInputElement)?.value} />
+                            <input type="hidden" name="name" defaultValue={(document.getElementsByName('name')[0] as HTMLInputElement)?.value} />
+                            <button
+                                type="submit"
+                                disabled={isGenerating || isPending}
+                                className="w-full py-2.5 rounded-xl text-xs font-bold text-slate-900 border border-slate-300 bg-yellow-50 hover:bg-yellow-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin text-yellow-600" /> Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Zap className="w-4 h-4 text-yellow-600" /> Generate Description with AI
+                                    </>
+                                )}
+                            </button>
+                        </form>
                     </div>
                   </div>
                 </div>
