@@ -3,11 +3,13 @@
 import pool from '@/src/lib/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { z } from 'zod';
-import { GoogleGenAI } from '@google/genai';
+import { z } from 'zod'; 
+import { saveImage } from '@/src/lib/upload'; 
+import { CohereClient } from "cohere-ai";
 
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const cohere = new CohereClient({
+  token: process.env.COHERE_API_KEY,
+});
 
 const productSchema = z.object({
   sku: z.string().min(3, "SKU minimal 3 karakter"),
@@ -57,15 +59,22 @@ export async function createProduct(prevState: ActionState, formData: FormData):
   }
 
   const { sku, name, description, price, location } = validatedFields.data;
-  
-  const image_url = "/images/default-product.png"; 
+  const imageFile = formData.get('image') as File;
+  let image_url = "/images/default-product.png"; 
+
+  try {
+    const uploadedPath = await saveImage(imageFile);
+    if (uploadedPath) image_url = uploadedPath;
+  } catch (error) {
+    console.error('Upload Error:', error);
+  }
 
   try {
     const checkSku = await pool.query('SELECT id FROM products WHERE sku = $1', [sku]);
     if (checkSku.rows.length > 0) {
       return {
         errors: { sku: ['SKU ini sudah terdaftar. Gunakan SKU lain.'] },
-        message: 'Gagal menyimpan data.',
+        message: 'Gagal menyimpan data (SKU Duplikat).',
       };
     }
 
@@ -75,10 +84,8 @@ export async function createProduct(prevState: ActionState, formData: FormData):
       [name, sku, description || '', price, location, image_url]
     );
   } catch (error) {
-    console.error('Create Error:', error);
-    return {
-      message: 'Terjadi kesalahan database. Silakan coba lagi nanti.'
-    };
+    console.error('Database Error:', error);
+    return { message: 'Terjadi kesalahan sistem database.' };
   }
 
   revalidatePath('/');
@@ -91,12 +98,22 @@ export async function editProduct(id: number, formData: FormData) {
   const description = formData.get('description') as string;
   const price = formData.get('price');
   const location = formData.get('location') as string;
+  const imageFile = formData.get('image') as File;
 
   try {
-    await pool.query(
-      `UPDATE products SET name = $1, sku = $2, description = $3, price = $4, location = $5 WHERE id = $6`,
-      [name, sku, description, price, location, id]
-    );
+    let query = `UPDATE products SET name = $1, sku = $2, description = $3, price = $4, location = $5`;
+    let params: any[] = [name, sku, description, price, location];
+    
+    const newImagePath = await saveImage(imageFile);
+    if (newImagePath) {
+        query += `, image_url = $6 WHERE id = $7`;
+        params.push(newImagePath, id);
+    } else {
+        query += ` WHERE id = $6`;
+        params.push(id);
+    }
+
+    await pool.query(query, params);
   } catch (error) {
     console.error('Edit Error:', error);
     return; 
@@ -108,23 +125,20 @@ export async function editProduct(id: number, formData: FormData) {
 }
 
 export async function deleteProduct(id: number) {
-  const client = await pool.connect();
-
-  try {
-    await client.query('BEGIN');
-    await client.query('DELETE FROM stock_movements WHERE product_id = $1', [id]);
-    await client.query('DELETE FROM products WHERE id = $1', [id]);
-    await client.query('COMMIT');
-    
-    revalidatePath('/');
-    return { success: true, message: 'Product deleted successfully' };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Delete Error:', error);
-    return { success: false, message: 'Failed to delete product' };
-  } finally {
-    client.release();
-  }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM stock_movements WHERE product_id = $1', [id]);
+      await client.query('DELETE FROM products WHERE id = $1', [id]);
+      await client.query('COMMIT');
+      revalidatePath('/');
+      return { success: true, message: 'Product deleted successfully' };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      return { success: false, message: 'Failed to delete product' };
+    } finally {
+      client.release();
+    }
 }
 
 export async function updateStock(prevState: any, formData: FormData) {
@@ -133,26 +147,18 @@ export async function updateStock(prevState: any, formData: FormData) {
   const quantity = parseInt(formData.get('quantity') as string);
   const notes = formData.get('notes') as string;
 
-  if (!productId || !quantity || quantity <= 0) {
-    return { success: false, message: 'Jumlah harus angka positif!' };
-  }
-  if (!notes || notes.trim() === '') {
-    return { success: false, message: 'Catatan transaksi wajib diisi!' };
-  }
+  if (!productId || !quantity || quantity <= 0) return { success: false, message: 'Jumlah harus angka positif!' };
+  if (!notes || !notes.trim()) return { success: false, message: 'Catatan wajib diisi!' };
 
   const client = await pool.connect();
-
   try {
     await client.query('BEGIN');
-    
     const res = await client.query('SELECT stock FROM products WHERE id = $1', [productId]);
     const currentStock = res.rows[0]?.stock || 0;
 
-    if (type === 'OUT') {
-      if (currentStock < quantity) {
+    if (type === 'OUT' && currentStock < quantity) {
         await client.query('ROLLBACK');
         return { success: false, message: `Stok tidak cukup! Sisa: ${currentStock}` };
-      }
     }
     
     const newStock = type === 'IN' ? currentStock + quantity : currentStock - quantity;
@@ -162,91 +168,56 @@ export async function updateStock(prevState: any, formData: FormData) {
        VALUES ($1, $2, $3, $4, $5)`, 
       [productId, type, quantity, notes, newStock]
     );
-
-    await client.query(
-      `UPDATE products SET stock = $1 WHERE id = $2`, 
-      [newStock, productId]
-    );
-
+    await client.query(`UPDATE products SET stock = $1 WHERE id = $2`, [newStock, productId]);
     await client.query('COMMIT'); 
+    
     revalidatePath('/');
     revalidatePath(`/history/${productId}`);
-    
     return { success: true, message: 'Transaksi berhasil disimpan!' };
-
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Transaction Error:', error);
-    return { success: false, message: 'Terjadi kesalahan pada server database.' };
+    return { success: false, message: 'Terjadi kesalahan sistem.' };
   } finally {
     client.release();
   }
 }
 
+
 export async function searchProducts(query: string) {
   if (!query || query.length < 2) return [];
-
   const client = await pool.connect();
   try {
     const res = await client.query(
       `SELECT id, sku, name, stock, price, location, image_url 
-       FROM products 
-       WHERE name ILIKE $1 OR sku ILIKE $1 
-       LIMIT 10`,
-      [`%${query}%`]
+       FROM products WHERE name ILIKE $1 OR sku ILIKE $1 LIMIT 10`, [`%${query}%`]
     );
-    
-    return res.rows.map(row => ({
-      ...row,
-      price: row.price.toString(), 
-      stock: Number(row.stock)
-    }));
-  } catch (error) {
-    console.error('Search Error:', error);
-    return [];
-  } finally {
-    client.release();
-  }
+    return res.rows.map(row => ({ ...row, price: row.price.toString(), stock: Number(row.stock) }));
+  } catch (error) { return []; } finally { client.release(); }
 }
 
 export async function processBulkTransaction(items: { id: number; quantity: number }[], type: 'IN' | 'OUT') {
   const client = await pool.connect();
-  
   try {
     await client.query('BEGIN');
-
     for (const item of items) {
       const res = await client.query('SELECT stock FROM products WHERE id = $1 FOR UPDATE', [item.id]);
-      
-      if (res.rows.length === 0) {
-         throw new Error(`Produk dengan ID ${item.id} tidak ditemukan.`);
-      }
-
+      if (res.rows.length === 0) throw new Error(`Produk ID ${item.id} tidak ditemukan.`);
       const currentStock = Number(res.rows[0].stock);
-
-      if (type === 'OUT' && currentStock < item.quantity) {
-        throw new Error(`Stok tidak cukup untuk produk ID ${item.id}. Sisa: ${currentStock}`);
-      }
-
+      if (type === 'OUT' && currentStock < item.quantity) throw new Error(`Stok kurang untuk ID ${item.id}.`);
+      
       const newStock = type === 'IN' ? currentStock + item.quantity : currentStock - item.quantity;
-
       await client.query(
-        `INSERT INTO stock_movements (product_id, type, quantity, notes, ending_stock)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [item.id, type, item.quantity, type === 'OUT' ? 'Bulk Outbound Order' : 'Bulk Inbound Receipt', newStock]
+        `INSERT INTO stock_movements (product_id, type, quantity, notes, ending_stock) VALUES ($1, $2, $3, $4, $5)`,
+        [item.id, type, item.quantity, type === 'OUT' ? 'Bulk Out' : 'Bulk In', newStock]
       );
-
       await client.query(`UPDATE products SET stock = $1 WHERE id = $2`, [newStock, item.id]);
     }
-
     await client.query('COMMIT');
     revalidatePath('/'); 
-    return { success: true, message: `Berhasil memproses ${items.length} item!` };
-
+    return { success: true, message: `Sukses memproses ${items.length} item!` };
   } catch (error: any) {
     await client.query('ROLLBACK');
-    console.error('Bulk Transaction Error:', error);
-    return { success: false, message: error.message || 'Gagal memproses transaksi massal.' };
+    return { success: false, message: error.message || 'Gagal transaksi massal.' };
   } finally {
     client.release();
   }
@@ -257,102 +228,112 @@ export async function getProductBySku(sku: string) {
   try {
     const res = await client.query('SELECT * FROM products WHERE sku = $1', [sku]);
     const product = res.rows[0];
-    if (product) {
-        product.stock = Number(product.stock);
-        product.price = product.price.toString();
-    }
+    if (product) { product.stock = Number(product.stock); product.price = product.price.toString(); }
     return product || null;
-  } catch (error) {
-    console.error('Scan Error:', error);
-    return null;
-  } finally {
-    client.release();
-  }
+  } catch (error) { return null; } finally { client.release(); }
 }
 
 export async function generateDescription(sku: string, name: string): Promise<{ success: boolean, description?: string, message?: string }> {
-  
-  if (!sku || !name) {
-      return { success: false, message: 'SKU dan Nama wajib diisi terlebih dahulu untuk menghasilkan deskripsi.' };
-  }
+  if (!sku || !name) return { success: false, message: 'SKU dan Nama wajib diisi.' };
+  if (!process.env.COHERE_API_KEY) return { success: false, message: 'API Key Cohere tidak ditemukan.' };
 
-  if (!ai) {
-      console.error("GEMINI_API_KEY is missing in .env.local");
-      return { 
-        success: false, 
-        message: 'Konfigurasi Server Error: API Key AI tidak ditemukan.' 
-      };
-  }
-
-  const prompt = `Anda adalah Asisten Inventaris Profesional untuk sistem WMS.
-  Tugas: Buatlah deskripsi produk yang ringkas, menarik, dan profesional (maksimal 3 kalimat).
-  Data Produk:
+  const prompt = `Anda adalah Asisten Inventaris Profesional. 
+  Tugas: Buat deskripsi produk yang ringkas (maksimal 3 kalimat) untuk produk berikut:
   - Nama: ${name}
   - SKU: ${sku}
   
-  Deskripsi harus dalam Bahasa Indonesia yang baku dan menonjolkan nilai produk untuk keperluan logistik atau penjualan. Jangan sertakan teks pembuka seperti "Berikut adalah deskripsi...". Langsung ke konten deskripsi.`;
+  Bahasa: Indonesia.
+  Output: Hanya teks deskripsi saja, tanpa pembuka atau penutup.`;
 
   try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash', 
-        contents: prompt,
-        config: {
-          temperature: 0.7,
-          maxOutputTokens: 150,
-        }
+      const chatPrediction = await cohere.chat({
+        model: 'command-r-08-2024',
+        message: prompt,
       });
-      
-      const generatedText = response.text().trim();
 
-      if (!generatedText) {
-          throw new Error('API mengembalikan respons kosong.');
-      }
-
-      return { success: true, description: generatedText };
-
+      const description = chatPrediction.text;
+      return { success: true, description: description.trim() };
   } catch (error) {
-      console.error('AI Generation Error:', error);
-      return { success: false, message: 'Gagal menghubungi Gemini AI. Pastikan koneksi internet server stabil.' };
+      console.error('Cohere AI Error:', error);
+      return { success: false, message: 'Gagal menghubungi Cohere AI.' };
   }
 }
 
 export async function getRestockPrediction(): Promise<PredictionResult[]> {
   const res = await pool.query(`
-    SELECT 
-      p.id as product_id, 
-      p.name as product_name, 
-      p.sku, 
-      p.stock as current_stock,
-      p.location,
-      SUM(sm.quantity) as total_out
-    FROM stock_movements sm
-    JOIN products p ON sm.product_id = p.id
+    SELECT p.id as product_id, p.name as product_name, p.sku, p.stock as current_stock, p.location, SUM(sm.quantity) as total_out
+    FROM stock_movements sm JOIN products p ON sm.product_id = p.id
     WHERE sm.type = 'OUT' AND sm.created_at >= NOW() - INTERVAL '30 days'
     GROUP BY p.id, p.name, p.sku, p.stock, p.location
-    ORDER BY total_out DESC
-    LIMIT 3
+    ORDER BY total_out DESC LIMIT 3
   `);
   
-  if (res.rows.length === 0) {
-    return [];
-  }
-
-  // Logika Prediksi Sederhana
+  if (res.rows.length === 0) return [];
   return res.rows.map(row => {
-    const totalOut = Number(row.total_out);
-    const avgDailyOut = totalOut / 30; 
+    const avgDailyOut = Number(row.total_out) / 30;
     const predictionQty = Math.ceil(avgDailyOut * 90); 
-    
     const daysToEmpty = avgDailyOut > 0 ? Math.floor(row.current_stock / avgDailyOut) : 999;
-    
     return {
-      product_id: row.product_id,
-      product_name: row.product_name,
-      sku: row.sku,
-      current_stock: Number(row.current_stock),
-      location: row.location || 'N/A',
-      prediction_qty: predictionQty > 0 ? predictionQty : 10,
-      days_to_empty: daysToEmpty,
+      product_id: row.product_id, product_name: row.product_name, sku: row.sku,
+      current_stock: Number(row.current_stock), location: row.location || 'N/A',
+      prediction_qty: predictionQty > 0 ? predictionQty : 10, days_to_empty: daysToEmpty,
     } as PredictionResult;
   });
+}
+
+export async function autoCreateProduct(prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const prompt = formData.get('prompt') as string;
+  if (!prompt || prompt.length < 5) return { message: 'Prompt terlalu pendek.' };
+  if (!process.env.COHERE_API_KEY) return { message: 'API Key Cohere tidak ditemukan.' };
+
+  const systemPrompt = `Anda adalah asisten database inventaris. 
+  Tugas: Konversi permintaan pengguna menjadi data JSON produk valid.
+  Format JSON Wajib:
+  {
+    "sku": "string (singkat, unik, kapital)",
+    "name": "string (nama produk lengkap)",
+    "description": "string (deskripsi pendek)",
+    "price": integer (harga dalam IDR tanpa simbol),
+    "location": "string (lokasi rak gudang)"
+  }
+  
+  HANYA berikan JSON valid. Jangan ada teks lain atau markdown (seperti \`\`\`json).`;
+
+  try {
+      const response = await cohere.chat({
+          model: 'command-r-08-2024',
+          message: `Buatkan produk dari: "${prompt}"`,
+          preamble: systemPrompt,
+          temperature: 0.3,
+      });
+
+      let rawText = response.text.trim();
+      rawText = rawText.replace(/```json/g, "").replace(/```/g, "");
+
+      const aiData = JSON.parse(rawText);
+      
+      const validation = productSchema.safeParse({ ...aiData, price: Number(aiData.price) });
+      if (!validation.success) {
+        console.error("Validasi Gagal:", validation.error);
+        return { message: "AI menghasilkan data tidak valid." };
+      }
+
+      const { sku, name, description, price, location } = validation.data;
+      
+      const checkSku = await pool.query('SELECT id FROM products WHERE sku = $1', [sku]);
+      const finalSku = checkSku.rows.length > 0 ? `${sku}-${Math.floor(Math.random()*1000)}` : sku;
+
+      await pool.query(
+          `INSERT INTO products (name, sku, description, price, location, image_url, stock)
+           VALUES ($1, $2, $3, $4, $5, $6, 0)`,
+          [name, finalSku, description, price, location, "/images/default-product.png"]
+      );
+
+  } catch (error: any) {
+      console.error('Auto-Create Error:', error);
+      return { message: `Terjadi kesalahan AI: ${error.message}` };
+  }
+
+  revalidatePath('/');
+  redirect('/');
 }

@@ -2,21 +2,26 @@
 
 import { createProduct, generateDescription } from '../actions';
 import Link from 'next/link';
-import { Box, MapPin, Layers, Tag, AlignLeft, ArrowLeft, CheckCircle2, AlertCircle, Loader2, Zap } from 'lucide-react';
-import { useActionState, useState } from 'react'; 
+import { Box, MapPin, Layers, Tag, AlignLeft, ArrowLeft, CheckCircle2, AlertCircle, Loader2, Zap, Image as ImageIcon } from 'lucide-react';
+import { useFormState, useFormStatus } from 'react-dom';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 export default function AddProductPage() {
-  const [state, formAction, isPending] = useActionState(createProduct, null);
+  const [state, formAction] = useFormState(createProduct, null);
   const [description, setDescription] = useState(''); 
   const [isGenerating, setIsGenerating] = useState(false); 
 
-  const handleGenerateDescription = async (formData: FormData) => {
-    const sku = formData.get('sku') as string;
-    const name = formData.get('name') as string;
+  const handleGenerateDescription = async () => {
+    const skuInput = document.querySelector('input[name="sku"]') as HTMLInputElement;
+    const nameInput = document.querySelector('input[name="name"]') as HTMLInputElement;
+    
+    const sku = skuInput?.value;
+    const name = nameInput?.value;
 
     if (!sku || !name) {
-        toast.error("SKU dan Nama produk harus diisi terlebih dahulu!");
+        toast.error("Mohon isi SKU dan Nama Produk terlebih dahulu!");
+        skuInput?.focus();
         return;
     }
     
@@ -33,7 +38,8 @@ export default function AddProductPage() {
             toast.error(result.message || "Gagal menghasilkan deskripsi AI.");
         }
     } catch (e) {
-        toast.error("Terjadi kesalahan saat memanggil layanan AI.");
+        console.error(e);
+        toast.error("Terjadi kesalahan koneksi saat memanggil AI.");
     } finally {
         setIsGenerating(false);
     }
@@ -73,9 +79,9 @@ export default function AddProductPage() {
             </div>
           )}
 
-          {/* Form utama menggunakan createProduct Server Action */}
           <form action={formAction} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
               <div className="space-y-6">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-100">
@@ -91,9 +97,7 @@ export default function AddProductPage() {
                         required 
                         className={`w-full border p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 outline-none font-mono text-sm font-medium transition-all ${state?.errors?.sku ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
                       />
-                      {state?.errors?.sku && (
-                        <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.sku[0]}</p>
-                      )}
+                      {state?.errors?.sku && <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.sku[0]}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Product Name</label>
@@ -102,11 +106,9 @@ export default function AddProductPage() {
                         type="text" 
                         placeholder="e.g. Premium Arabica Coffee" 
                         required 
-                        className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-medium transition-all hover:border-slate-300" 
+                        className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 outline-none text-sm font-medium transition-all" 
                       />
-                      {state?.errors?.name && (
-                        <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.name[0]}</p>
-                      )}
+                      {state?.errors?.name && <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.name[0]}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Base Price (IDR)</label>
@@ -118,12 +120,23 @@ export default function AddProductPage() {
                           placeholder="0"
                           required 
                           min="100" 
-                          className="w-full border border-slate-200 bg-slate-50 p-3 pl-10 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm font-bold transition-all hover:border-slate-300" 
+                          className="w-full border border-slate-200 bg-slate-50 p-3 pl-10 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 outline-none text-sm font-bold transition-all" 
                         />
                       </div>
-                      {state?.errors?.price && (
-                        <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.price[0]}</p>
-                      )}
+                      {state?.errors?.price && <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.price[0]}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1 flex items-center gap-2">
+                        <ImageIcon className="w-3 h-3" /> Product Image
+                      </label>
+                      <input 
+                        name="image" 
+                        type="file" 
+                        accept="image/png, image/jpeg, image/webp"
+                        className="w-full border border-slate-200 bg-slate-50 p-2 rounded-xl text-slate-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-slate-900 file:text-white hover:file:bg-slate-700 cursor-pointer"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1 ml-1">Format: JPG, PNG, WEBP (Max 2MB)</p>
                     </div>
                   </div>
                 </div>
@@ -132,7 +145,7 @@ export default function AddProductPage() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <Layers className="w-4 h-4 text-slate-400" /> Storage Details
+                    <Layers className="w-4 h-4 text-slate-400" /> Storage & Details
                   </h3>
                   <div className="space-y-4">
                     <div>
@@ -147,12 +160,10 @@ export default function AddProductPage() {
                           type="text" 
                           placeholder="Zone-Rack-Level (e.g. A-01-05)" 
                           required 
-                          className="w-full border border-emerald-100 bg-emerald-50/30 p-3 pl-10 rounded-xl text-emerald-900 placeholder:text-emerald-900/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none font-bold text-sm tracking-wide transition-all" 
+                          className="w-full border border-emerald-100 bg-emerald-50/30 p-3 pl-10 rounded-xl text-emerald-900 placeholder:text-emerald-900/30 focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-sm tracking-wide transition-all" 
                         />
                       </div>
-                      {state?.errors?.location && (
-                        <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.location[0]}</p>
-                      )}
+                      {state?.errors?.location && <p className="mt-1 text-[10px] font-bold text-rose-500">{state.errors.location[0]}</p>}
                     </div>
                     
                     <div>
@@ -162,33 +173,30 @@ export default function AddProductPage() {
                       <textarea 
                         name="description" 
                         rows={4} 
-                        placeholder="Write a brief description about the product specifications..."
-                        value={description}
+                        placeholder="Product specifications and details..."
+                        value={description} 
                         onChange={(e) => setDescription(e.target.value)}
-                        className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all text-sm font-medium resize-none hover:border-slate-300"
+                        className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-slate-900 outline-none transition-all text-sm font-medium resize-none hover:border-slate-300"
                       ></textarea>
                     </div>
 
                     <div className="pt-2">
-                        <form action={handleGenerateDescription}>
-                            <input type="hidden" name="sku" defaultValue={(document.getElementsByName('sku')[0] as HTMLInputElement)?.value} />
-                            <input type="hidden" name="name" defaultValue={(document.getElementsByName('name')[0] as HTMLInputElement)?.value} />
-                            <button
-                                type="submit"
-                                disabled={isGenerating || isPending}
-                                className="w-full py-2.5 rounded-xl text-xs font-bold text-slate-900 border border-slate-300 bg-yellow-50 hover:bg-yellow-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isGenerating ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin text-yellow-600" /> Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Zap className="w-4 h-4 text-yellow-600" /> Generate Description with AI
-                                    </>
-                                )}
-                            </button>
-                        </form>
+                        <button
+                            type="button" 
+                            onClick={handleGenerateDescription}
+                            disabled={isGenerating}
+                            className="w-full py-2.5 rounded-xl text-xs font-bold text-slate-900 border border-slate-300 bg-yellow-50 hover:bg-yellow-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin text-yellow-600" /> Generating...
+                                </>
+                            ) : (
+                                <>
+                                    <Zap className="w-4 h-4 text-yellow-600" /> Generate Description with AI
+                                </>
+                            )}
+                        </button>
                     </div>
                   </div>
                 </div>
@@ -202,25 +210,33 @@ export default function AddProductPage() {
               >
                 Cancel
               </Link>
-              <button 
-                type="submit" 
-                disabled={isPending}
-                className="flex-1 bg-slate-900 text-white py-3 rounded-xl hover:bg-slate-800 transition-all font-bold shadow-lg shadow-slate-900/20 active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isPending ? (
-                    <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Saving...
-                    </>
-                ) : (
-                    <>
-                        <CheckCircle2 className="w-4 h-4" /> Save Master Data
-                    </>
-                )}
-              </button>
+              <SubmitButton />
             </div>
           </form>
         </div>
       </div>
     </main>
+  );
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button 
+      type="submit" 
+      disabled={pending}
+      className="flex-1 bg-slate-900 text-white py-3 rounded-xl hover:bg-slate-800 transition-all font-bold shadow-lg shadow-slate-900/20 active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+    >
+      {pending ? (
+          <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+          </>
+      ) : (
+          <>
+              <CheckCircle2 className="w-4 h-4" /> Save Master Data
+          </>
+      )}
+    </button>
   );
 }
